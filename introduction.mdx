@@ -1,0 +1,230 @@
+---
+title: Welcome to QA Automation Learning
+description: Master test automation using Playwright and pytest with the Page Object Model pattern
+mode: custom
+---
+
+<div className="relative overflow-hidden bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 dark:from-emerald-800 dark:via-emerald-900 dark:to-gray-900">
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9nPjwvc3ZnPg==')] opacity-20"></div>
+  
+  <div className="relative max-w-6xl mx-auto px-6 sm:px-8 py-20 lg:py-24">
+    <div className="grid lg:grid-cols-12 gap-12 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+          Master Test Automation with Playwright
+        </h1>
+        <p className="text-lg sm:text-xl text-emerald-50 max-w-2xl mb-8 leading-relaxed">
+          A comprehensive learning repository demonstrating modern test automation patterns using Playwright, pytest, and the Page Object Model. Build reliable, maintainable test suites for web applications.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a 
+            href="/quickstart" 
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors shadow-lg"
+          >
+            Get Started
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
+          <a 
+            href="/concepts/page-object-model" 
+            className="inline-flex items-center px-6 py-3 rounded-lg border-2 border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors backdrop-blur-sm"
+          >
+            Learn Core Concepts
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="bg-gray-900/50 backdrop-blur-sm border border-emerald-400/30 rounded-lg p-6 shadow-2xl">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-3 h-3 rounded-full bg-red-400"></div>
+            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+            <div className="w-3 h-3 rounded-full bg-green-400"></div>
+          </div>
+          <pre className="text-sm text-emerald-100 overflow-x-auto"><code>{`from pages.login import LoginPage
+from playwright.sync_api import Page
+
+def test_successful_login(page: Page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("user", "password")
+    
+    # Assert successful login
+    assert page.get_by_test_id("title").is_visible()`}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get your test automation environment up and running in minutes
+  </p>
+
+  <Steps>
+    <Step title="Clone the repository">
+      Get started by cloning this learning repository to your local machine:
+      
+      ```bash
+      git clone https://github.com/darket1989/qa-automation-learning.git
+      cd qa-automation-learning
+      ```
+    </Step>
+    
+    <Step title="Install dependencies">
+      Install Python dependencies and Playwright browsers:
+      
+      ```bash
+      pip install -r requirements.txt
+      playwright install
+      ```
+      
+      The project uses pytest, Playwright, and supporting libraries for test automation.
+    </Step>
+    
+    <Step title="Run your first test">
+      Execute a sample login test to verify your setup:
+      
+      ```bash
+      pytest tests/test_login.py -v
+      ```
+      
+      <Accordion title="Expected output">
+        ```
+        tests/test_login.py::test_valid_login PASSED
+        tests/test_login.py::test_invalid_login PASSED
+        tests/test_login.py::test_logout_session PASSED
+        ```
+      </Accordion>
+    </Step>
+    
+    <Step title="Explore the Page Object Model">
+      Check out the page objects in the `pages/` directory to understand how reusable components are structured. Start with `pages/login.py` to see a complete example.
+      
+      Learn more in the [Page Object Model guide](/concepts/page-object-model).
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Explore by Topic
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Dive into specific areas of test automation
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Page Object Model" icon="layer-group" href="/concepts/page-object-model">
+      Learn how to organize test code using the Page Object Model design pattern for better maintainability
+    </Card>
+    <Card title="UI Testing" icon="browser" href="/tests/ui-testing">
+      Master browser automation and UI testing with Playwright's powerful API
+    </Card>
+    <Card title="API Testing" icon="code" href="/tests/api-testing">
+      Test REST APIs using Playwright's request context for comprehensive coverage
+    </Card>
+    <Card title="Test Fixtures" icon="flask" href="/concepts/fixtures">
+      Understand pytest fixtures for test data management and setup/teardown operations
+    </Card>
+    <Card title="CI/CD Integration" icon="rotate" href="/advanced/ci-cd">
+      Automate your tests with GitHub Actions and continuous integration pipelines
+    </Card>
+    <Card title="Best Practices" icon="star" href="/advanced/best-practices">
+      Follow proven patterns for writing reliable, maintainable test automation
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">
+    Key Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    What makes this learning repository comprehensive
+  </p>
+
+  <div className="grid md:grid-cols-2 gap-6">
+    <div className="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+      <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        Real-World Examples
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400">
+        All test examples use actual web applications, demonstrating practical automation scenarios you'll encounter in production environments
+      </p>
+    </div>
+
+    <div className="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+      <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        Test Data Management
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400">
+        Learn multiple approaches for managing test data including JSON files, environment variables, and pytest fixtures
+      </p>
+    </div>
+
+    <div className="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+      <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        Dual Testing Approach
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400">
+        Cover both UI and API testing in a single framework, maximizing test coverage across your application stack
+      </p>
+    </div>
+
+    <div className="p-6 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+      <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+        CI/CD Ready
+      </h3>
+      <p className="text-gray-600 dark:text-gray-400">
+        Includes GitHub Actions workflow configuration for automated test execution on every push and pull request
+      </p>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-800 dark:to-emerald-900 p-8 sm:p-12 border border-emerald-500/20">
+    <div className="max-w-3xl">
+      <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
+        Ready to Start Learning?
+      </h2>
+      <p className="text-emerald-50 text-lg mb-6">
+        Follow the quickstart guide to set up your environment and run your first automated tests in minutes.
+      </p>
+      <a 
+        href="/quickstart" 
+        className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors shadow-lg"
+      >
+        View Quickstart Guide
+        <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+    </div>
+  </div>
+</div>

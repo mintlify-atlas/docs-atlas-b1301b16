@@ -1,0 +1,436 @@
+---
+title: Assertions and Expectations
+description: Master different assertion techniques for validating test outcomes in Playwright and pytest
+icon: check
+---
+
+## Overview
+
+Assertions verify that your tests produce expected results. Playwright provides two assertion styles: pytest assertions and Playwright's web-first `expect()` assertions. Each has specific use cases and advantages.
+
+## Assertion Types
+
+<CardGroup cols={2}>
+  <Card title="pytest Assertions" icon="python">
+    Traditional Python assertions using `assert` keyword. Best for simple checks and non-Playwright objects.
+  </Card>
+  <Card title="Playwright Expect" icon="wand-magic-sparkles">
+    Web-first assertions with auto-waiting and retry logic. Best for UI element checks.
+  </Card>
+</CardGroup>
+
+## Basic pytest Assertions
+
+Use standard Python `assert` statements for simple validations:
+
+```python test_assertions.py (Lines 9-12)
+# Basic assertions after login
+assert page.locator('[data-test="title"]')
+assert page.locator('[data-test="shopping-cart-link"]')
+assert page.locator('[data-test="inventory-list"]')
+```
+
+<Tabs>
+  <Tab title="Equality">
+    ```python
+    # Check equality
+    assert page.url == "https://www.saucedemo.com/inventory.html"
+    assert user_id == 209
+    assert username == "standard_user"
+    
+    # Check inequality
+    assert password != ""
+    assert status_code != 404
+    ```
+  </Tab>
+  <Tab title="Truthiness">
+    ```python
+    # Check if truthy
+    assert user_data
+    assert response.ok
+    assert login_button.is_visible()
+    
+    # Check if falsy
+    assert not error_message
+    ```
+  </Tab>
+  <Tab title="Membership">
+    ```python
+    # Check containment
+    assert "Emily" in user["firstName"]
+    assert "error" not in response.text()
+    assert user_id in active_users
+    ```
+  </Tab>
+  <Tab title="Comparisons">
+    ```python
+    # Numeric comparisons
+    assert user_count > 0
+    assert response.status >= 200
+    assert response.status < 300
+    assert age <= 100
+    ```
+  </Tab>
+</Tabs>
+
+## Playwright Web-First Assertions
+
+Playwright's `expect()` provides auto-waiting and retry logic, making tests more reliable:
+
+```python test_functionalities.py (Lines 23-24)
+from playwright.sync_api import expect
+
+cart_page = CartPage(page)
+cart_page.add_product("sauce-labs-backpack")
+expect(cart_page.cart_badge).to_contain_text("2")
+```
+
+<Note>
+  **Auto-waiting**: `expect()` automatically waits up to 5 seconds for the condition to be met, retrying until it passes or times out.
+</Note>
+
+### Visibility Assertions
+
+Check if elements are visible or hidden:
+
+```python test_functionalities.py (Lines 11-18)
+def test_successful_login(page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+<CodeGroup>
+
+```python Visible
+# Element is visible
+expect(page.locator("#welcome-message")).to_be_visible()
+
+# Using pytest assert
+assert page.locator("#welcome-message").is_visible()
+```
+
+```python Hidden
+# Element is hidden or doesn't exist
+expect(page.locator(".loading-spinner")).to_be_hidden()
+
+# Cart badge is hidden after removing items
+expect(cart_page.cart_badge.locator(".shopping_cart_badge")).to_be_hidden()
+```
+
+```python Attached
+# Element exists in DOM (may not be visible)
+expect(page.locator("#hidden-field")).to_be_attached()
+```
+
+</CodeGroup>
+
+### Text Content Assertions
+
+Verify element text content:
+
+```python
+# Contains specific text
+expect(cart_page.cart_badge).to_contain_text("2")
+
+# Exact text match
+expect(page.locator("h1")).to_have_text("Products")
+
+# Text matches regex
+expect(page.locator(".price")).to_have_text(/\$\d+\.\d{2}/)
+```
+
+<Warning>
+  `to_contain_text()` is case-sensitive. Use `.lower()` or regex patterns for case-insensitive matching.
+</Warning>
+
+### CSS and Style Assertions
+
+Validate element styling and CSS properties:
+
+```python test_assertions.py (Lines 14-19)
+# Check button colors before and after clicking
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css(
+    "color", "rgb(19, 35, 34)"
+)
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css(
+    "background-color", "rgb(255, 255, 255)"
+)
+
+page.locator('[data-test="add-to-cart-sauce-labs-backpack"]').click()
+
+# After clicking, button color changes
+expect(page.locator('[data-test="remove-sauce-labs-backpack"]')).to_have_css(
+    "color", "rgb(226, 35, 26)"
+)
+```
+
+<Accordion title="Common CSS Properties to Test">
+  - **color**: Text color (use RGB format)
+  - **background-color**: Background color
+  - **display**: Element display type (block, flex, none, etc.)
+  - **font-size**: Text size
+  - **border**: Border properties
+  - **opacity**: Transparency level
+</Accordion>
+
+## URL Assertions
+
+Verify navigation and URL changes:
+
+```python test_login.py (Lines 19-20)
+assert page.get_by_test_id("title").is_visible
+assert page.url == login_dashboard
+```
+
+<CodeGroup>
+
+```python Exact URL
+# Exact match
+assert page.url == "https://www.saucedemo.com/inventory.html"
+
+# Using expect
+expect(page).to_have_url("https://www.saucedemo.com/inventory.html")
+```
+
+```python URL Pattern
+# Contains substring
+assert "/inventory" in page.url
+
+# Matches regex
+expect(page).to_have_url(/.*\/inventory\.html$/)
+```
+
+```python URL Parts
+# Check specific parts
+from urllib.parse import urlparse
+url = urlparse(page.url)
+assert url.scheme == "https"
+assert url.hostname == "www.saucedemo.com"
+assert url.path == "/inventory.html"
+```
+
+</CodeGroup>
+
+## Element State Assertions
+
+Check various element states:
+
+<Tabs>
+  <Tab title="Enabled/Disabled">
+    ```python
+    # Element is enabled
+    expect(page.locator("#submit-button")).to_be_enabled()
+    
+    # Element is disabled
+    expect(page.locator("#submit-button")).to_be_disabled()
+    ```
+  </Tab>
+  <Tab title="Checked/Unchecked">
+    ```python
+    # Checkbox is checked
+    expect(page.locator("#agree-terms")).to_be_checked()
+    
+    # Checkbox is unchecked
+    expect(page.locator("#agree-terms")).not_to_be_checked()
+    ```
+  </Tab>
+  <Tab title="Focused">
+    ```python
+    # Element has focus
+    expect(page.locator("#username")).to_be_focused()
+    ```
+  </Tab>
+  <Tab title="Editable">
+    ```python
+    # Element is editable
+    expect(page.locator("#comment")).to_be_editable()
+    
+    # Element is read-only
+    expect(page.locator("#locked-field")).not_to_be_editable()
+    ```
+  </Tab>
+</Tabs>
+
+## Attribute Assertions
+
+Validate HTML attributes:
+
+```python
+# Has specific attribute value
+expect(page.locator("a")).to_have_attribute("href", "/login")
+
+# Attribute contains value
+expect(page.locator("input")).to_have_attribute("class", /form-control/)
+
+# Has attribute (any value)
+expect(page.locator("img")).to_have_attribute("alt")
+```
+
+## Count Assertions
+
+Verify the number of matching elements:
+
+```python
+# Exact count
+expect(page.locator(".product-item")).to_have_count(6)
+
+# At least/most
+assert page.locator(".product-item").count() >= 1
+assert page.locator(".error-message").count() == 0
+```
+
+## Value Assertions
+
+Check input field values:
+
+```python
+# Input has specific value
+expect(page.locator("#username")).to_have_value("standard_user")
+
+# Empty input
+expect(page.locator("#search")).to_have_value("")
+
+# Using pytest
+assert page.locator("#email").input_value() == "user@example.com"
+```
+
+## API Response Assertions
+
+Validate API responses in API tests:
+
+```python test_API.py (Lines 33-36)
+def test_create_user(api_context: APIRequestContext):
+    response = api_context.post(
+        "users/add",
+        headers={"Content-Type": "application/json"},
+        data={"firstName": "Damien", "lastName": "Smith", "age": 27}
+    )
+    
+    user_data = response.json()
+    assert user_data["id"] == 209
+    assert user_data["firstName"] == "Damien"
+```
+
+<CodeGroup>
+
+```python Status Codes
+# Success status
+assert response.ok
+assert response.status == 200
+
+# Error status
+assert response.status == 404
+assert not response.ok
+```
+
+```python Response Body
+# JSON structure
+data = response.json()
+assert "id" in data
+assert "firstName" in data
+assert data["firstName"] == "Damien"
+```
+
+```python Response Headers
+# Check headers
+assert "application/json" in response.headers["content-type"]
+assert "x-api-version" in response.headers
+```
+
+</CodeGroup>
+
+## Negative Assertions
+
+Invert any assertion using `.not_`:
+
+```python
+# Element should NOT be visible
+expect(page.locator(".error")).not_to_be_visible()
+
+# Text should NOT be present
+expect(page.locator("h1")).not_to_contain_text("Error")
+
+# Element should NOT have class
+expect(page.locator("button")).not_to_have_class("disabled")
+
+# Using pytest
+assert "error" not in page.url
+assert not error_message.is_visible()
+```
+
+## Custom Timeout
+
+Adjust auto-wait timeout for specific assertions:
+
+```python
+# Wait up to 10 seconds
+expect(page.locator(".slow-loading")).to_be_visible(timeout=10000)
+
+# Wait only 1 second
+expect(page.locator(".fast-element")).to_be_visible(timeout=1000)
+```
+
+## Assertion Best Practices
+
+<Steps>
+  <Step title="Use web-first assertions for UI">
+    Prefer `expect()` for Playwright locators to get auto-waiting and retry logic
+  </Step>
+  <Step title="Use pytest assertions for simple checks">
+    Use `assert` for URLs, API responses, and simple value comparisons
+  </Step>
+  <Step title="Be specific">
+    Use precise assertions like `to_have_text()` instead of just `to_be_visible()`
+  </Step>
+  <Step title="Test negative cases">
+    Verify elements are hidden or absent when expected
+  </Step>
+  <Step title="Add meaningful messages">
+    Include custom messages for complex assertions to help debugging
+  </Step>
+</Steps>
+
+<Tip>
+  **When to use which?**
+  - Use `expect()` for Playwright locators and UI elements
+  - Use `assert` for URLs, API responses, Python objects, and simple checks
+</Tip>
+
+## Debugging Failed Assertions
+
+When assertions fail, Playwright provides helpful error messages:
+
+```python
+# Failed assertion output:
+# AssertionError: Locator expected to be visible
+# Locator: page.locator('#missing-element')
+# Received: <not found>
+
+# Add screenshots on failure (in conftest.py)
+@pytest.fixture
+def page(context):
+    page = context.new_page()
+    yield page
+    if hasattr(page, '_test_failed'):
+        page.screenshot(path=f"screenshots/{test_name}.png")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="UI Testing" icon="browser" href="/tests/ui-testing">
+    Learn comprehensive UI testing
+  </Card>
+  <Card title="API Testing" icon="code" href="/tests/api-testing">
+    Test REST APIs effectively
+  </Card>
+  <Card title="Parametrization" icon="table" href="/tests/parametrization">
+    Run tests with multiple datasets
+  </Card>
+  <Card title="Best Practices" icon="star" href="/advanced/best-practices">
+    Learn testing best practices
+  </Card>
+</CardGroup>

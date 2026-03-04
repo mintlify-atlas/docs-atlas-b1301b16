@@ -1,0 +1,177 @@
+---
+title: 'Test Fixtures'
+description: 'Pytest fixtures for test data and credentials management'
+icon: 'flask'
+---
+
+## Overview
+
+Test fixtures provide reusable test data and configuration across the test suite. All fixtures are defined in `conftest.py` and are automatically available to all test files.
+
+---
+
+## users
+
+```python
+@pytest.fixture(scope="session")
+def users():
+```
+
+Loads test user data from `testData/users.json` and returns it as a dictionary. This fixture is session-scoped, meaning the JSON file is loaded once per test session for optimal performance.
+
+**Scope:** `session`
+
+**Source:** `/workspace/source/tests/conftest.py:8`
+
+### Returns
+
+<ResponseField name="users" type="dict">
+  Dictionary containing user test data loaded from the JSON file
+  
+  <Expandable title="properties">
+    <ResponseField name="valid_user" type="object">
+      Valid user credentials and information
+      <Expandable title="properties">
+        <ResponseField name="username" type="string">
+          Valid username for testing
+        </ResponseField>
+        <ResponseField name="password" type="string">
+          Valid password for testing
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="invalid_user" type="object">
+      Invalid user credentials for negative testing
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Usage Example
+
+```python
+def test_login_with_valid_user(users):
+    """Test login using data from users fixture"""
+    username = users["valid_user"]["username"]
+    password = users["valid_user"]["password"]
+    
+    # Use credentials in your test
+    login_page.login(username, password)
+    assert dashboard.is_displayed()
+
+def test_user_data_loaded(users):
+    """Verify users fixture provides expected data"""
+    assert "valid_user" in users
+    assert "invalid_user" in users
+```
+
+---
+
+## creds
+
+```python
+@pytest.fixture(scope="session")
+def creds():
+```
+
+Provides authentication credentials loaded from environment variables (`.env` file). This fixture fails early with a clear error message if required environment variables are missing.
+
+**Scope:** `session`
+
+**Source:** `/workspace/source/tests/conftest.py:22`
+
+### Environment Variables Required
+
+<ParamField path="USERNAME" type="string" required>
+  Valid username loaded from environment
+</ParamField>
+
+<ParamField path="PASSWORD" type="string" required>
+  Valid password loaded from environment
+</ParamField>
+
+### Returns
+
+<ResponseField name="creds" type="dict">
+  Dictionary containing credentials from environment variables
+  
+  <Expandable title="properties">
+    <ResponseField name="valid_user" type="string">
+      Username from `USERNAME` environment variable
+    </ResponseField>
+    
+    <ResponseField name="pwd" type="string">
+      Password from `PASSWORD` environment variable
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Usage Example
+
+```python
+def test_login_with_env_credentials(creds):
+    """Test login using credentials from environment"""
+    username = creds["valid_user"]
+    password = creds["pwd"]
+    
+    login_page.login(username, password)
+    assert dashboard.is_displayed()
+
+def test_api_authentication(creds):
+    """Use credentials for API testing"""
+    response = requests.post(
+        "https://api.example.com/login",
+        json={
+            "username": creds["valid_user"],
+            "password": creds["pwd"]
+        }
+    )
+    assert response.status_code == 200
+```
+
+### Error Handling
+
+The fixture raises a `RuntimeError` if either `USERNAME` or `PASSWORD` environment variables are not set:
+
+```python
+RuntimeError: Missing USERNAME/PASSWORD in environment.
+```
+
+<Tip>
+Create a `.env` file in your project root with `USERNAME` and `PASSWORD` values to use this fixture.
+</Tip>
+
+---
+
+## Best Practices
+
+### Using Fixtures Together
+
+You can combine multiple fixtures in a single test:
+
+```python
+def test_compare_user_sources(users, creds):
+    """Compare data from JSON and environment sources"""
+    json_username = users["valid_user"]["username"]
+    env_username = creds["valid_user"]
+    
+    # Both sources should provide valid credentials
+    assert json_username is not None
+    assert env_username is not None
+```
+
+### Session Scope Benefits
+
+Both fixtures use `scope="session"` which means:
+- Data is loaded once per test session
+- Faster test execution (no repeated file I/O)
+- Consistent data across all tests
+- Efficient resource usage
+
+### Fixture Location
+
+All fixtures are defined in `tests/conftest.py`, making them automatically discoverable by pytest across the entire test suite. No imports are needed to use these fixtures.
+
+<Warning>
+Ensure sensitive credentials are never committed to version control. Always use `.env` files (added to `.gitignore`) or secure environment variable management.
+</Warning>

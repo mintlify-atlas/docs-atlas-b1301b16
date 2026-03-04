@@ -1,0 +1,122 @@
+---
+title: 'CheckoutPage'
+description: 'Page Object for handling checkout process'
+---
+
+## Overview
+
+The `CheckoutPage` class manages the checkout process on the SauceDemo application. It provides methods to initiate checkout and verify checkout page elements.
+
+## Initialization
+
+```python
+from pages.checkout import CheckoutPage
+from playwright.sync_api import Page
+
+checkout = CheckoutPage(page)
+```
+
+<ParamField path="page" type="Page" required>
+  Playwright Page object for browser interaction
+</ParamField>
+
+## Locators
+
+The CheckoutPage class defines the following locators:
+
+| Locator | Selector | Description |
+|---------|----------|-------------|
+| `checkout_button` | `[data-test="checkout"]` | Checkout button to proceed with purchase |
+| `checkout_message` | `[data-test="title"]` | Title/message displayed on checkout page |
+
+## Methods
+
+### go_to_checkout()
+
+Initiates the checkout process by clicking the checkout button.
+
+```python
+checkout = CheckoutPage(page)
+checkout.go_to_checkout()
+```
+
+**Returns:** `None`
+
+## Usage Examples
+
+### Complete Checkout Flow
+
+```python
+from pages.login import LoginPage
+from pages.cart_page import CartPage
+from pages.checkout import CheckoutPage
+from playwright.sync_api import expect
+
+def test_checkout_process(page):
+    # Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    assert page.get_by_test_id("title").is_visible
+    
+    # Add products to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    expect(cart_page.cart_badge).to_contain_text("2")
+    
+    # Go to cart
+    cart_page.go_to_cart()
+    
+    # Proceed to checkout
+    checkout = CheckoutPage(page)
+    checkout.go_to_checkout()
+    
+    # Verify checkout page loaded
+    expect(checkout.checkout_message).to_be_visible()
+```
+
+### Verify Checkout Page
+
+```python
+def test_checkout_page_visibility(page):
+    # Assume user is logged in and has items in cart
+    cart_page = CartPage(page)
+    cart_page.go_to_cart()
+    
+    checkout = CheckoutPage(page)
+    checkout.go_to_checkout()
+    
+    # Verify we're on the checkout page
+    expect(checkout.checkout_message).to_be_visible()
+    assert "checkout" in page.url.lower()
+```
+
+### End-to-End Purchase Flow
+
+```python
+def test_full_purchase_flow(page):
+    # Step 1: Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    
+    # Step 2: Add items to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    expect(cart_page.cart_badge).to_contain_text("1")
+    
+    # Step 3: Navigate to cart
+    cart_page.go_to_cart()
+    
+    # Step 4: Proceed to checkout
+    checkout = CheckoutPage(page)
+    checkout.go_to_checkout()
+    
+    # Step 5: Verify checkout page
+    expect(checkout.checkout_message).to_be_visible()
+```
+
+## Source Code
+
+Location: `/home/daytona/workspace/source/pages/checkout.py:3`

@@ -1,0 +1,298 @@
+---
+title: UI Testing with Playwright
+description: Learn how to write effective UI tests using Playwright with practical examples from real test cases
+icon: browser
+---
+
+## Overview
+
+UI testing validates that your web application's user interface works correctly. This guide demonstrates how to write UI tests using Playwright, covering element interactions, navigation, and user workflows.
+
+## Basic UI Test Structure
+
+Every UI test follows a simple pattern: navigate to a page, interact with elements, and verify the results.
+
+### Simple Login Test
+
+Here's a complete example from `test_login.py:7-20` that tests a valid login:
+
+```python test_login.py
+from playwright.sync_api import Page
+import pytest
+
+URL = "https://www.saucedemo.com/"
+login_dashboard = "https://www.saucedemo.com/inventory.html"
+
+def test_valid_login(page: Page):
+    page.goto(URL)
+    
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill("standard_user")
+
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill("secret_sauce")
+
+    login_button = page.locator("input#login-button")
+    login_button.click()
+    
+    assert page.get_by_test_id("title").is_visible
+    assert page.url == login_dashboard
+```
+
+<Steps>
+  <Step title="Navigate to the page">
+    Use `page.goto()` to load the application URL
+  </Step>
+  <Step title="Locate elements">
+    Use locators like `get_by_placeholder()`, `get_by_test_id()`, or `locator()` to find elements
+  </Step>
+  <Step title="Interact with elements">
+    Use actions like `fill()`, `click()`, `select_option()` to interact with the page
+  </Step>
+  <Step title="Verify results">
+    Use assertions to confirm expected outcomes
+  </Step>
+</Steps>
+
+## Element Locator Strategies
+
+Playwright offers multiple ways to locate elements. Choose the most reliable method for your use case.
+
+<CardGroup cols={2}>
+  <Card title="By Test ID" icon="tag">
+    Most reliable, uses `data-test` or `data-testid` attributes
+    ```python
+    page.get_by_test_id("title")
+    ```
+  </Card>
+  <Card title="By Placeholder" icon="keyboard">
+    Great for form inputs
+    ```python
+    page.get_by_placeholder("Username")
+    ```
+  </Card>
+  <Card title="By Text" icon="text">
+    Finds elements containing specific text
+    ```python
+    page.get_by_text("Epic sadface")
+    ```
+  </Card>
+  <Card title="CSS/XPath Selector" icon="code">
+    Maximum flexibility when other methods don't work
+    ```python
+    page.locator("input#login-button")
+    ```
+  </Card>
+</CardGroup>
+
+<Note>
+  **Best Practice**: Prefer `get_by_test_id()` for critical elements. It's the most stable locator and won't break when UI text or structure changes.
+</Note>
+
+## Testing Negative Scenarios
+
+Always test failure cases to ensure proper error handling:
+
+```python test_login.py (Lines 22-35)
+def test_invalid_login(page: Page):
+    page.goto(URL)
+    
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill("standard_user")
+
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill("secret")  # Wrong password
+
+    login_button = page.locator("input#login-button")
+    login_button.click()
+
+    error_message = page.get_by_text("Epic sadface: Username and password do not match any user in this service")
+    assert error_message.is_visible
+```
+
+<Warning>
+  Don't just test the "happy path". Invalid inputs, network failures, and edge cases often reveal critical bugs.
+</Warning>
+
+## Complete User Workflows
+
+Test entire user journeys from start to finish:
+
+```python test_login.py (Lines 37-55)
+def test_logout_session(page: Page):
+    page.goto(URL)
+    
+    # Login first
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill("standard_user")
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill("secret_sauce")
+    login_button = page.locator("input#login-button")
+    login_button.click()
+
+    # Then logout
+    open_menu_button = page.locator("button#react-burger-menu-btn")
+    open_menu_button.click()
+    logout_option = page.locator("a#logout_sidebar_link")
+    logout_option.click()
+
+    # Verify we're back to login
+    assert login_button.is_visible()
+```
+
+## Using Page Object Model
+
+For better maintainability, use the Page Object Model pattern to encapsulate page interactions:
+
+<CodeGroup>
+
+```python test_functionalities.py
+from pages.login import LoginPage
+from playwright.sync_api import Page
+
+def test_successful_login(page: Page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+```python pages/login.py
+from playwright.sync_api import Page
+
+class LoginPage:
+    def __init__(self, page):
+        self.page = page
+        self.username_input = page.locator('[data-test="username"]')
+        self.password_input = page.locator('[data-test="password"]')
+        self.login_button = page.locator('[data-test="login-button"]')
+
+    def navigate(self):
+        self.page.goto("https://www.saucedemo.com/")
+
+    def login(self, username, password):
+        self.username_input.fill(username)
+        self.password_input.fill(password)
+        self.login_button.click()
+```
+
+</CodeGroup>
+
+<Check>
+  **Why use Page Objects?** They make tests more readable, reduce code duplication, and make maintenance easier when UI changes.
+</Check>
+
+## Complex Interactions
+
+Test complex workflows involving multiple pages and actions:
+
+```python test_functionalities.py (Lines 13-34)
+def test_add_remove_products(page):
+    # Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    assert page.get_by_test_id("title").is_visible
+
+    # Add products to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    expect(cart_page.cart_badge).to_contain_text("2")
+
+    # Go to cart
+    cart_page.go_to_cart()
+
+    # Remove products from cart
+    cart_page.remove_product("sauce-labs-backpack")
+    cart_page.remove_product("sauce-labs-bike-light")
+
+    # Assert cart_badge no longer exists
+    expect(cart_page.cart_badge.locator(".shopping_cart_badge")).to_be_hidden()
+```
+
+## Common Element Actions
+
+<Tabs>
+  <Tab title="Text Input">
+    ```python
+    # Fill text input
+    page.locator("#email").fill("user@example.com")
+    
+    # Clear and fill
+    page.locator("#email").clear()
+    page.locator("#email").fill("new@example.com")
+    ```
+  </Tab>
+  <Tab title="Clicks">
+    ```python
+    # Simple click
+    page.locator("button#submit").click()
+    
+    # Double click
+    page.locator("#element").dblclick()
+    
+    # Right click
+    page.locator("#element").click(button="right")
+    ```
+  </Tab>
+  <Tab title="Dropdowns">
+    ```python
+    # Select by value
+    page.locator("#country").select_option("USA")
+    
+    # Select by label
+    page.locator("#country").select_option(label="United States")
+    ```
+  </Tab>
+  <Tab title="Checkboxes">
+    ```python
+    # Check
+    page.locator("#agree").check()
+    
+    # Uncheck
+    page.locator("#agree").uncheck()
+    
+    # Verify state
+    assert page.locator("#agree").is_checked()
+    ```
+  </Tab>
+</Tabs>
+
+## Waiting Strategies
+
+Playwright automatically waits for elements, but you can add explicit waits when needed:
+
+```python
+# Wait for element to be visible
+page.locator("#loading-spinner").wait_for(state="hidden")
+
+# Wait for navigation
+with page.expect_navigation():
+    page.locator("#submit").click()
+
+# Wait with timeout
+page.locator("#slow-element").wait_for(timeout=10000)  # 10 seconds
+```
+
+<Tip>
+  Playwright has built-in auto-waiting. You rarely need explicit waits unless dealing with animations, AJAX calls, or custom loading states.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Testing" icon="code" href="/tests/api-testing">
+    Learn to test backend APIs
+  </Card>
+  <Card title="Assertions" icon="check" href="/tests/assertions">
+    Master different assertion techniques
+  </Card>
+  <Card title="Parametrization" icon="table" href="/tests/parametrization">
+    Run tests with multiple data sets
+  </Card>
+  <Card title="Page Object Model" icon="layer-group" href="/concepts/page-object-model">
+    Deep dive into POM pattern
+  </Card>
+</CardGroup>

@@ -1,0 +1,785 @@
+---
+title: 'Best Practices'
+description: 'Testing best practices and design patterns from real-world implementation'
+icon: 'star'
+---
+
+## Overview
+
+This guide compiles best practices derived from analyzing the actual codebase structure, test patterns, and implementation decisions in the project.
+
+## Project Architecture
+
+The project follows a well-organized structure:
+
+```
+source/
+├── .github/workflows/     # CI/CD automation
+├── pages/                 # Page Object Models
+│   ├── login.py
+│   ├── cart_page.py
+│   └── checkout.py
+├── tests/                 # Test suites
+│   ├── conftest.py       # Fixtures and configuration
+│   ├── test_login.py     # Login scenarios
+│   ├── test_functionalities.py  # Feature tests
+│   └── test_assertions.py       # Assertion examples
+├── testData/             # Test data management
+│   └── users.json
+├── requirements.txt      # Dependencies
+└── notes.txt            # Team guidelines
+```
+
+<Note>
+  This separation of concerns makes the codebase scalable and maintainable.
+</Note>
+
+## Page Object Model (POM)
+
+The project implements POM consistently across all page objects.
+
+### Structure Pattern
+
+<CodeGroup>
+```python Standard Pattern
+from playwright.sync_api import Page
+
+class PageName:
+    def __init__(self, page: Page):
+        self.page = page
+        # 1. Define all locators in __init__
+        self.element1 = page.locator('[data-test="element1"]')
+        self.element2 = page.locator('#element2')
+    
+    def navigate(self):
+        # 2. Navigation method
+        self.page.goto("URL")
+    
+    def action_method(self):
+        # 3. Action methods
+        self.element1.click()
+    
+    def get_data(self) -> str:
+        # 4. Data retrieval methods
+        return self.element2.text_content()
+```
+
+```python Real Example - login.py
+from playwright.sync_api import Page
+
+class LoginPage:
+    def __init__(self, page):
+        self.page = page
+        self.username_input = page.locator('[data-test="username"]')
+        self.password_input = page.locator('[data-test="password"]')
+        self.login_button = page.locator('[data-test="login-button"]')
+
+    def navigate(self):
+        self.page.goto("https://www.saucedemo.com/")
+
+    def login(self, username, password):
+        self.username_input.fill(username)
+        self.password_input.fill(password)
+        self.login_button.click()
+```
+</CodeGroup>
+
+### POM Principles
+
+<AccordionGroup>
+  <Accordion title="Single Responsibility">
+    Each page object represents one page or component:
+    
+    - `LoginPage` - handles login page interactions
+    - `CartPage` - manages cart operations
+    - `CheckoutPage` - checkout process
+    
+    ```python
+    # Good - focused responsibility
+    class CartPage:
+        def add_product(self, product_name: str):
+            ...
+        
+        def remove_product(self, product_name: str):
+            ...
+    
+    # Avoid - mixed responsibilities
+    class CartPage:
+        def login(self):  # Login is not cart's responsibility
+            ...
+    ```
+  </Accordion>
+
+  <Accordion title="Encapsulation">
+    Hide implementation details from tests:
+    
+    ```python
+    # test_functionalities.py:6-9
+    def test_successful_login(page):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login("standard_user", "secret_sauce")
+        # Test doesn't know about locators
+    ```
+    
+    The test doesn't care about `data-test` attributes or selectors.
+  </Accordion>
+
+  <Accordion title="Return Values for Chaining">
+    ```python
+    # Pattern allows for fluent interfaces
+    class LoginPage:
+        def login(self, username, password) -> 'LoginPage':
+            self.username_input.fill(username)
+            self.password_input.fill(password)
+            self.login_button.click()
+            return self
+    
+    # Enable chaining
+    login_page.navigate().login("user", "pass")
+    ```
+  </Accordion>
+
+  <Accordion title="Type Hints">
+    ```python
+    # From cart_page.py:14, 23
+    def add_product(self, product_name: str):
+        ...
+    
+    def get_cart_count(self) -> int:
+        if self.cart_badge.count() == 0:
+            return 0
+        return int(self.cart_badge.text_content())
+    ```
+    
+    Type hints improve IDE support and catch errors early.
+  </Accordion>
+</AccordionGroup>
+
+## Test Organization
+
+### Test File Structure
+
+The project organizes tests by functionality:
+
+- `test_login.py` - Login-specific scenarios (valid/invalid/logout/multiple users)
+- `test_functionalities.py` - End-to-end user flows using page objects
+- `test_assertions.py` - Assertion patterns and examples
+- `test_API.py` - API testing (separate from UI)
+
+### Naming Conventions
+
+```python
+# Clear, descriptive test names
+def test_valid_login(page: Page):           # test_login.py:7
+def test_invalid_login(page: Page):         # test_login.py:22
+def test_logout_session(page: Page):        # test_login.py:37
+def test_add_remove_products(page):         # test_functionalities.py:13
+def test_checkout_process(page):            # test_functionalities.py:37
+```
+
+<Tip>
+  Test names should describe what they test, not how they test it.
+</Tip>
+
+## Fixtures and Configuration
+
+### conftest.py Structure
+
+The project's `conftest.py` demonstrates proper fixture usage:
+
+<CodeGroup>
+```python Test Data Fixture
+import json
+from pathlib import Path
+import pytest
+
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    root = Path(__file__).parent.parent
+    data_path = root / "testData" / "users.json"
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+```
+
+```python Environment Variables
+from dotenv import load_dotenv
+import os
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+@pytest.fixture(scope="session")
+def creds():
+    """
+    Provides credentials from environment variables.
+    Fails early with a clear message if missing.
+    """
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment.")
+    return {"valid_user": user, "pwd": pwd}
+```
+</CodeGroup>
+
+### Fixture Scope
+
+```python
+# Session scope - created once per test session
+@pytest.fixture(scope="session")
+def users():
+    return json.load(...)  # Loaded once, reused across all tests
+
+# Function scope (default) - created for each test
+@pytest.fixture
+def cart_page(page):
+    return CartPage(page)  # New instance per test
+```
+
+<Note>
+  Use `scope="session"` for expensive operations like loading test data. Use function scope for test isolation.
+</Note>
+
+## Test Data Management
+
+The project uses multiple approaches:
+
+### 1. JSON Files
+
+```json testData/users.json
+{
+  "validUser": { 
+    "username": "standard_user", 
+    "password": "secret_sauce" 
+  },
+  "invalidUser": { 
+    "username": "locked_out_user", 
+    "password": "secret_sauce" 
+  }
+}
+```
+
+```python Usage
+# test_functionalities.py:59-64
+def test_with_testdata(page, users):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(
+        users["validUser"]["username"], 
+        users["validUser"]["password"]
+    )
+    assert page.get_by_test_id("title").is_visible
+```
+
+### 2. Environment Variables
+
+```python
+# test_functionalities.py:66-72
+def test_login_with_env_vars(page, creds):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(creds["valid_user"], creds["pwd"])
+    assert page.get_by_test_id("title").is_visible
+```
+
+<Warning>
+  Never commit `.env` files to version control. Add to `.gitignore`:
+  
+  ```
+  .env
+  *.env
+  ```
+</Warning>
+
+### 3. Parametrization
+
+```python
+# test_login.py:58-76
+@pytest.mark.parametrize("username, password", [
+    ("error_user", "secret_sauce"),
+    ("performance_glitch_user", "secret_sauce"),
+    ("visual_user", "secret_sauce")
+])
+def test_multiple_users(page: Page, username, password):
+    page.goto(URL)
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill(username)
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill(password)
+    login_button = page.locator("input#login-button")
+    login_button.click()
+    assert page.get_by_test_id("title").is_visible
+```
+
+<Tip>
+  Parametrization runs the same test with different inputs, reducing code duplication.
+</Tip>
+
+## Assertions
+
+The project uses two assertion styles:
+
+### Standard Python Assertions
+
+```python
+# test_login.py:20
+assert page.url == login_dashboard
+
+# test_functionalities.py:11
+assert page.get_by_test_id("title").is_visible
+
+# test_login.py:55
+assert login_button.is_visible()
+```
+
+### Playwright expect() - Recommended
+
+```python
+from playwright.sync_api import expect
+
+# test_functionalities.py:24
+expect(cart_page.cart_badge).to_contain_text("2")
+
+# test_functionalities.py:34
+expect(cart_page.cart_badge.locator(".shopping_cart_badge")).to_be_hidden()
+
+# test_assertions.py:14-15
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css("color", "rgb(19, 35, 34)")
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css("background-color", "rgb(255, 255, 255)")
+```
+
+### Why expect() is Better
+
+<CardGroup cols={2}>
+  <Card title="Auto-retry" icon="rotate">
+    `expect()` retries until condition is met or timeout, reducing flakiness.
+  </Card>
+  
+  <Card title="Better Errors" icon="triangle-exclamation">
+    Clear error messages showing expected vs actual values.
+  </Card>
+  
+  <Card title="Web-first" icon="globe">
+    Designed for async web interactions with built-in waiting.
+  </Card>
+  
+  <Card title="Rich Matchers" icon="list-check">
+    Many matchers: to_be_visible, to_have_text, to_have_css, etc.
+  </Card>
+</CardGroup>
+
+## Handling Dynamic Elements
+
+### Approach from cart_page.py
+
+```python
+# cart_page.py:14-21
+def add_product(self, product_name: str):
+    add_button = self.page.locator(f"#add-to-cart-{product_name}")
+    add_button.click()
+
+def remove_product(self, product_name: str):
+    remove_button = self.page.locator(f"#remove-{product_name}")
+    remove_button.click()
+```
+
+This pattern:
+- Uses f-strings for dynamic IDs
+- Keeps locator logic in page object
+- Makes tests readable: `cart_page.add_product("sauce-labs-backpack")`
+
+### Guard Against Missing Elements
+
+```python
+# cart_page.py:23-27
+def get_cart_count(self) -> int:
+    if self.cart_badge.count() == 0:
+        return 0
+    return int(self.cart_badge.text_content())
+```
+
+Always check element existence before accessing properties.
+
+## Test Independence
+
+Each test should be independent and self-contained:
+
+```python
+# Good - each test sets up its own state
+def test_add_remove_products(page):
+    # Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    
+    # Test cart operations
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    # ...
+
+def test_checkout_process(page):
+    # Login again (doesn't depend on previous test)
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    # ...
+```
+
+<Warning>
+  Tests should never depend on execution order. Each test should set up its own preconditions.
+</Warning>
+
+## Error Handling
+
+### Clear Error Messages
+
+```python
+# conftest.py:29-30
+if not user or not pwd:
+    raise RuntimeError("Missing USERNAME/PASSWORD in environment.")
+```
+
+Fail fast with descriptive errors to help debugging.
+
+### Verify Negative Scenarios
+
+```python
+# test_login.py:22-35
+def test_invalid_login(page: Page):
+    page.goto(URL)
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill("standard_user")
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill("secret")  # Wrong password
+    login_button = page.locator("input#login-button")
+    login_button.click()
+    
+    # Verify error message appears
+    error_message = page.get_by_text("Epic sadface: Username and password do not match")
+    assert error_message.is_visible
+```
+
+Always test both success and failure paths.
+
+## Dependencies Management
+
+The project uses `requirements.txt`:
+
+```txt requirements.txt
+pytest
+pytest-html
+pytest-playwright
+playwright
+python-dotenv
+```
+
+### Installation Steps
+
+<Steps>
+  <Step title="Install Python packages">
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Step>
+
+  <Step title="Install Playwright browsers">
+    ```bash
+    playwright install
+    # Or with system dependencies
+    playwright install --with-deps
+    ```
+  </Step>
+</Steps>
+
+### Pin Versions in Production
+
+```txt
+# Development - flexible versions
+pytest
+playwright
+
+# Production - pinned versions
+pytest==8.0.0
+playwright==1.40.0
+```
+
+## CI/CD Best Practices
+
+From `.github/workflows/playwright.yml`:
+
+### Fail Fast
+
+```yaml
+# playwright.yml:59
+--maxfail=1  # Stop after first failure
+```
+
+Saves CI time by not running remaining tests after first failure.
+
+### Artifact Collection
+
+```yaml
+# playwright.yml:61-67
+- name: Upload test results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: test-results
+    path: test-results/
+    retention-days: 7
+```
+
+Always upload artifacts, even on failure, for debugging.
+
+### Concurrency Control
+
+```yaml
+# playwright.yml:13-15
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+Cancel old runs when new commits are pushed.
+
+## Code Quality
+
+### Import Organization
+
+```python
+# Standard library imports first
+import os
+import json
+from pathlib import Path
+
+# Third-party imports
+import pytest
+from dotenv import load_dotenv
+
+# Playwright imports
+from playwright.sync_api import Page, expect
+
+# Local imports
+from pages.login import LoginPage
+from pages.cart_page import CartPage
+```
+
+### Docstrings
+
+```python
+# conftest.py:8-13
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    ...
+```
+
+Document fixtures and complex methods.
+
+### Type Hints
+
+```python
+# Improves readability and catches errors
+def login(self, username: str, password: str) -> None:
+    ...
+
+def get_cart_count(self) -> int:
+    ...
+
+def test_valid_login(page: Page):
+    ...
+```
+
+## Common Pitfalls to Avoid
+
+<AccordionGroup>
+  <Accordion title="Hardcoded waits">
+    ```python
+    # Bad
+    import time
+    time.sleep(5)
+    
+    # Good - Playwright auto-waits
+    page.locator("#button").click()
+    expect(element).to_be_visible()
+    ```
+  </Accordion>
+
+  <Accordion title="Repeating locators">
+    ```python
+    # Bad
+    page.locator('#username').fill("user")
+    page.locator('#username').clear()
+    
+    # Good - use page objects
+    login_page.username_input.fill("user")
+    ```
+  </Accordion>
+
+  <Accordion title="Test interdependencies">
+    ```python
+    # Bad - test2 depends on test1
+    def test1_create_user():
+        create_user("testuser")
+    
+    def test2_use_user():
+        login("testuser")  # Fails if test1 doesn't run
+    
+    # Good - each test is independent
+    def test_create_user():
+        create_user("testuser")
+        cleanup("testuser")
+    
+    def test_login():
+        create_user("testuser")  # Set up own data
+        login("testuser")
+        cleanup("testuser")
+    ```
+  </Accordion>
+
+  <Accordion title="Committing sensitive data">
+    ```python
+    # Bad - committed to repo
+    USERNAME = "admin"
+    PASSWORD = "secret123"
+    
+    # Good - from environment
+    USERNAME = os.getenv("USERNAME")
+    PASSWORD = os.getenv("PASSWORD")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Pyramid
+
+The project demonstrates good test distribution:
+
+```
+        /\        API Tests (fast, focused)
+       /  \       test_API.py
+      /____\      
+     /      \     Integration Tests (moderate)
+    /        \    test_functionalities.py
+   /          \   
+  /____________\  Unit/Component Tests (many, fast)
+                  test_login.py, test_assertions.py
+```
+
+<CardGroup cols={3}>
+  <Card title="Unit Tests" icon="cube">
+    Fast, focused tests for individual components
+  </Card>
+  
+  <Card title="Integration" icon="cubes">
+    Test multiple components working together
+  </Card>
+  
+  <Card title="E2E" icon="diagram-project">
+    Full user flows from login to checkout
+  </Card>
+</CardGroup>
+
+## Performance Tips
+
+### Reuse Browser Context
+
+```python
+# Use session-scoped fixtures for expensive setup
+@pytest.fixture(scope="session")
+def browser_context():
+    # Created once per session
+    pass
+```
+
+### Parallel Execution
+
+```bash
+# Install pytest-xdist
+pip install pytest-xdist
+
+# Run tests in parallel
+pytest tests/ -n auto
+```
+
+### Selective Test Execution
+
+```bash
+# Run specific test file
+pytest tests/test_login.py
+
+# Run specific test
+pytest tests/test_login.py::test_valid_login
+
+# Run by marker
+pytest -m smoke
+```
+
+## Documentation
+
+The project includes:
+
+- `README.md` - Project overview
+- `notes.txt` - Team guidelines (locator strategies)
+- Inline comments for complex logic
+- Docstrings for fixtures
+
+<Tip>
+  Keep a `notes.txt` or `TESTING.md` with team conventions and decisions.
+</Tip>
+
+## Summary Checklist
+
+<Steps>
+  <Step title="Structure">
+    - [ ] Separate page objects, tests, and test data
+    - [ ] One page object per page/component
+    - [ ] Logical test file organization
+  </Step>
+
+  <Step title="Page Objects">
+    - [ ] All locators in `__init__`
+    - [ ] Action methods for interactions
+    - [ ] Type hints for parameters and returns
+    - [ ] No assertions in page objects
+  </Step>
+
+  <Step title="Tests">
+    - [ ] Descriptive test names
+    - [ ] Independent tests (no execution order dependency)
+    - [ ] Both positive and negative scenarios
+    - [ ] Use `expect()` over standard assertions
+  </Step>
+
+  <Step title="Data Management">
+    - [ ] JSON files for test data
+    - [ ] Environment variables for secrets
+    - [ ] Parametrization for similar test cases
+    - [ ] Never commit sensitive data
+  </Step>
+
+  <Step title="CI/CD">
+    - [ ] Automated test runs on push/PR
+    - [ ] Artifact collection for debugging
+    - [ ] Fail fast with `--maxfail`
+    - [ ] Concurrency control to save resources
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Locator Strategies" icon="crosshairs" href="/advanced/locator-strategies">
+    Master reliable element location techniques
+  </Card>
+  
+  <Card title="CI/CD Integration" icon="rocket" href="/advanced/ci-cd">
+    Automate your tests with GitHub Actions
+  </Card>
+</CardGroup>

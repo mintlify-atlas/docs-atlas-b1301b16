@@ -1,0 +1,338 @@
+---
+title: 'CI/CD Integration'
+description: 'Learn how to integrate Playwright tests into GitHub Actions and other CI/CD pipelines'
+icon: 'rocket'
+---
+
+## Overview
+
+Continuous Integration ensures your tests run automatically on every code change. This project uses GitHub Actions to run Playwright tests on push and pull requests.
+
+## GitHub Actions Workflow
+
+The project includes a production-ready GitHub Actions workflow at `.github/workflows/playwright.yml`.
+
+### Workflow Configuration
+
+<CodeGroup>
+```yaml .github/workflows/playwright.yml
+name: CI - Run login test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          fi
+
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install --with-deps
+
+      - name: RUN TESTS
+        run: |
+          mkdir -p test-results
+          python -m pytest tests/test_login.py \
+            --junitxml=test-results/junit.xml \
+            --html=test-results/report.html --self-contained-html \
+            --maxfail=1 -q --disable-warnings
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+```
+</CodeGroup>
+
+## Key Features Explained
+
+<AccordionGroup>
+  <Accordion title="Concurrency Control">
+    ```yaml
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    ```
+    
+    This configuration automatically cancels previous workflow runs when new commits are pushed, saving CI minutes and providing faster feedback.
+  </Accordion>
+
+  <Accordion title="Conditional Browser Installation">
+    ```yaml
+    - name: Install Playwright browsers
+      if: ${{ always() }}
+      run: |
+        if python -c "import importlib.util; print(importlib.util.find_spec('playwright') is not None)"; then
+          python -m playwright install --with-deps
+        fi
+    ```
+    
+    The workflow checks if Playwright is installed before attempting to install browsers, preventing unnecessary failures.
+  </Accordion>
+
+  <Accordion title="Test Results Artifacts">
+    ```yaml
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test-results/
+        retention-days: 7
+    ```
+    
+    Test results are uploaded as artifacts regardless of test outcome, allowing you to review HTML reports and JUnit XML files.
+  </Accordion>
+</AccordionGroup>
+
+## Setting Up Your CI Pipeline
+
+<Steps>
+  <Step title="Create the workflow file">
+    Copy the workflow file to `.github/workflows/playwright.yml` in your repository.
+  </Step>
+
+  <Step title="Configure Python version">
+    The workflow uses Python 3.11. Update the `python-version` if you need a different version:
+    
+    ```yaml
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"  # Change to your preferred version
+    ```
+  </Step>
+
+  <Step title="Customize test execution">
+    Modify the pytest command to run your specific tests:
+    
+    ```bash
+    # Run all tests
+    python -m pytest tests/
+    
+    # Run specific test file
+    python -m pytest tests/test_login.py
+    
+    # Run with parallel execution
+    python -m pytest tests/ -n auto
+    ```
+  </Step>
+
+  <Step title="Push and verify">
+    Commit the workflow file and push to trigger the CI pipeline. Check the Actions tab in GitHub to view results.
+  </Step>
+</Steps>
+
+<Note>
+  The `--with-deps` flag installs system dependencies required for browsers on Linux. This is essential for CI environments.
+</Note>
+
+## Pytest Reporting Options
+
+The workflow generates multiple report formats:
+
+### JUnit XML
+```bash
+python -m pytest tests/ --junitxml=test-results/junit.xml
+```
+
+Used for CI integration and test result parsing by GitHub Actions.
+
+### HTML Reports
+```bash
+python -m pytest tests/ \
+  --html=test-results/report.html \
+  --self-contained-html
+```
+
+Generates a self-contained HTML report with test details, screenshots, and traces.
+
+### Custom Options
+```bash
+python -m pytest tests/ \
+  --maxfail=1        # Stop after first failure
+  -q                 # Quiet output
+  --disable-warnings # Hide warnings
+  -v                 # Verbose output
+```
+
+## Advanced CI Configurations
+
+### Matrix Testing
+
+Run tests across multiple Python versions and browsers:
+
+```yaml
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+        browser: ["chromium", "firefox", "webkit"]
+    
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Run tests
+        run: |
+          python -m pytest tests/ --browser=${{ matrix.browser }}
+```
+
+### Parallel Test Execution
+
+Speed up test execution with pytest-xdist:
+
+```yaml
+- name: Install dependencies
+  run: |
+    pip install pytest-xdist
+    pip install -r requirements.txt
+
+- name: Run tests in parallel
+  run: |
+    python -m pytest tests/ -n auto
+```
+
+### Environment Secrets
+
+For tests requiring credentials (see `conftest.py:22-30`):
+
+<Steps>
+  <Step title="Add secrets to GitHub">
+    Go to Settings → Secrets and variables → Actions → New repository secret
+    
+    Add:
+    - `USERNAME`
+    - `PASSWORD`
+  </Step>
+
+  <Step title="Reference in workflow">
+    ```yaml
+    - name: RUN TESTS
+      env:
+        USERNAME: ${{ secrets.USERNAME }}
+        PASSWORD: ${{ secrets.PASSWORD }}
+      run: |
+        python -m pytest tests/
+    ```
+  </Step>
+</Steps>
+
+<Warning>
+  Never commit `.env` files or credentials to version control. Always use CI secrets for sensitive data.
+</Warning>
+
+## Viewing Test Results
+
+### In GitHub Actions
+
+1. Navigate to the **Actions** tab in your repository
+2. Click on a workflow run
+3. View the test summary in the run details
+4. Download artifacts to access HTML reports
+
+### Downloading Artifacts
+
+```bash
+# Using GitHub CLI
+gh run download <run-id> -n test-results
+
+# Or download from the Actions UI
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Browser installation fails">
+    Ensure you're using the `--with-deps` flag:
+    
+    ```bash
+    python -m playwright install --with-deps
+    ```
+    
+    This installs required system dependencies on Linux.
+  </Accordion>
+
+  <Accordion title="Tests timeout in CI">
+    Increase timeout values in `pytest.ini` or use the `--timeout` flag:
+    
+    ```bash
+    python -m pytest tests/ --timeout=300
+    ```
+  </Accordion>
+
+  <Accordion title="Flaky tests">
+    Use pytest-retry or implement custom retry logic:
+    
+    ```bash
+    pip install pytest-rerunfailures
+    python -m pytest tests/ --reruns 3
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Fast Feedback" icon="bolt">
+    Keep test suites fast. Run critical tests first with `--maxfail=1` to fail fast.
+  </Card>
+  
+  <Card title="Artifact Retention" icon="clock">
+    Set appropriate retention days (default: 7) to balance storage costs and debugging needs.
+  </Card>
+  
+  <Card title="Workflow Triggers" icon="code-branch">
+    Use `workflow_dispatch` to allow manual workflow runs for debugging.
+  </Card>
+  
+  <Card title="Concurrency" icon="layer-group">
+    Cancel in-progress runs to save CI minutes and get faster feedback on new commits.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="/advanced/best-practices">
+    Learn testing best practices and patterns
+  </Card>
+  
+  <Card title="Locator Strategies" icon="crosshairs" href="/advanced/locator-strategies">
+    Master reliable element location techniques
+  </Card>
+</CardGroup>

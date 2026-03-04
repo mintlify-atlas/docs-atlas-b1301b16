@@ -1,0 +1,499 @@
+---
+title: 'Test Fixtures'
+description: 'Master pytest fixtures to set up test data, manage dependencies, and create reusable test components'
+icon: 'flask'
+---
+
+## What are Test Fixtures?
+
+**Fixtures** are functions that run before (and sometimes after) your test functions. They provide a fixed baseline for your tests by setting up necessary preconditions like test data, database connections, or initialized objects.
+
+<Note>
+  In pytest, fixtures are defined using the `@pytest.fixture` decorator and can be shared across multiple tests.
+</Note>
+
+## Why Use Fixtures?
+
+<CardGroup cols={2}>
+  <Card title="Reusability" icon="recycle">
+    Write setup code once and use it across multiple tests
+  </Card>
+  <Card title="Clean Code" icon="broom">
+    Keep test functions focused on testing, not setup
+  </Card>
+  <Card title="Dependency Injection" icon="plug">
+    Automatically provide dependencies to tests that need them
+  </Card>
+  <Card title="Scope Control" icon="layer-group">
+    Control when fixtures are created and destroyed
+  </Card>
+</CardGroup>
+
+## Real Fixtures from Our Test Suite
+
+Let's examine the actual fixtures defined in our project:
+
+<CodeGroup>
+```python tests/conftest.py (User Data Fixture)
+import json
+from pathlib import Path
+import pytest
+
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    root = Path(__file__).parent.parent  # go from /tests to project root
+    data_path = root / "testData" / "users.json"
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+```
+
+```python tests/conftest.py (Credentials Fixture)
+import os
+from pathlib import Path
+import pytest
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+@pytest.fixture(scope="session")
+def creds():
+    """
+    Provides credentials from environment variables.
+    Fails early with a clear message if missing.
+    """
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment. ")
+    return {"valid_user": user, "pwd": pwd}
+```
+</CodeGroup>
+
+## Understanding Fixture Scopes
+
+Fixtures can have different **scopes** that control how often they're created:
+
+<Tabs>
+  <Tab title="session">
+    **Created once per test session**
+
+    ```python
+    @pytest.fixture(scope="session")
+    def users():
+        # Created once, shared across all tests
+        data_path = Path(__file__).parent.parent / "testData" / "users.json"
+        with data_path.open(encoding="utf-8") as f:
+            return json.load(f)
+    ```
+
+    **Use when:**
+    - Loading static data that doesn't change
+    - Setting up expensive resources
+    - Data is read-only
+
+    <Note>
+      Our `users` fixture uses session scope because the JSON data is loaded once and never modified.
+    </Note>
+  </Tab>
+
+  <Tab title="function">
+    **Created for each test function (default)**
+
+    ```python
+    @pytest.fixture  # or scope="function"
+    def login_page(page):
+        # Created fresh for each test
+        return LoginPage(page)
+    ```
+
+    **Use when:**
+    - Each test needs a fresh instance
+    - Tests modify the fixture's state
+    - Most common scope for test isolation
+  </Tab>
+
+  <Tab title="module">
+    **Created once per module (.py file)**
+
+    ```python
+    @pytest.fixture(scope="module")
+    def database_connection():
+        # Created once per test file
+        conn = create_connection()
+        yield conn
+        conn.close()
+    ```
+
+    **Use when:**
+    - Sharing expensive setup across tests in one file
+    - Need cleanup after all tests in module
+  </Tab>
+
+  <Tab title="class">
+    **Created once per test class**
+
+    ```python
+    @pytest.fixture(scope="class")
+    def browser_context():
+        # Created once per test class
+        context = browser.new_context()
+        yield context
+        context.close()
+    ```
+
+    **Use when:**
+    - Testing class methods that share state
+    - Class-level setup and teardown needed
+  </Tab>
+</Tabs>
+
+## Using Fixtures in Tests
+
+Here are real examples from our test suite showing fixture usage:
+
+<Tabs>
+  <Tab title="Using User Data">
+    ```python tests/test_functionalities.py
+    from pages.login import LoginPage
+
+    def test_with_testdata(page, users):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login(users["validUser"]["username"], users["validUser"]["password"])
+
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    **How it works:**
+    1. Test declares `users` parameter
+    2. pytest automatically calls the `users()` fixture
+    3. Fixture loads JSON data
+    4. Test receives the data dictionary
+    5. Test accesses nested values: `users["validUser"]["username"]`
+
+    <Info>
+      The `page` parameter is also a fixture, provided by Playwright's pytest plugin.
+    </Info>
+  </Tab>
+
+  <Tab title="Using Environment Variables">
+    ```python tests/test_functionalities.py
+    from pages.login import LoginPage
+
+    def test_login_with_env_vars(page, creds):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login(creds["valid_user"], creds["pwd"])
+
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    **Security benefit:**
+    - Credentials stored in `.env` file (not committed to git)
+    - Loaded via `load_dotenv()` in conftest.py
+    - Tests access credentials without hardcoding
+
+    <Warning>
+      The fixture raises a `RuntimeError` if environment variables are missing, causing tests to fail fast with a clear error message.
+    </Warning>
+  </Tab>
+
+  <Tab title="Multiple Fixtures">
+    ```python
+    def test_complex_scenario(page, users, creds):
+        # Can use multiple fixtures in one test
+        # Each is automatically provided by pytest
+        pass
+    ```
+
+    **Fixture dependency:**
+    - Fixtures can depend on other fixtures
+    - pytest resolves dependencies automatically
+    - Order of parameters doesn't matter
+  </Tab>
+</Tabs>
+
+## The conftest.py File
+
+<Info>
+  **conftest.py** is a special pytest file where you define fixtures that should be available to all tests in the directory and subdirectories.
+</Info>
+
+### Our Project Structure
+
+```
+source/
+├── tests/
+│   ├── conftest.py          # Fixtures available to all tests
+│   ├── test_login.py
+│   ├── test_functionalities.py
+│   └── test_assertions.py
+├── pages/
+│   ├── login.py
+│   └── cart_page.py
+└── testData/
+    └── users.json           # Loaded by users fixture
+```
+
+### Complete conftest.py Breakdown
+
+<AccordionGroup>
+  <Accordion title="Imports and Setup">
+    ```python
+    import os
+    from pathlib import Path
+    import pytest
+    from dotenv import load_dotenv
+    import json
+    ```
+
+    - `Path`: For cross-platform file path handling
+    - `pytest`: For fixture decorators
+    - `dotenv`: For loading environment variables
+    - `json`: For parsing JSON test data
+  </Accordion>
+
+  <Accordion title="Users Fixture">
+    ```python
+    @pytest.fixture(scope="session")
+    def users():
+        """
+        Loads testData/users.json and returns a dict.
+        Accessible in any test as the 'users' fixture.
+        """
+        root = Path(__file__).parent.parent  # go from /tests to project root
+        data_path = root / "testData" / "users.json"
+        with data_path.open(encoding="utf-8") as f:
+            return json.load(f)
+    ```
+
+    **Key points:**
+    - Uses `Path(__file__).parent.parent` to navigate to project root
+    - Opens and parses JSON file
+    - Returns dictionary structure from users.json:line_1
+    - Session scope means it loads once for all tests
+  </Accordion>
+
+  <Accordion title="Credentials Fixture">
+    ```python
+    load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+    @pytest.fixture(scope="session")
+    def creds():
+        """
+        Provides credentials from environment variables.
+        Fails early with a clear message if missing.
+        """
+        user = os.getenv("USERNAME")
+        pwd = os.getenv("PASSWORD")
+        if not user or not pwd:
+            raise RuntimeError("Missing USERNAME/PASSWORD in environment. ")
+        return {"valid_user": user, "pwd": pwd}
+    ```
+
+    **Key points:**
+    - `load_dotenv()` called at module level (runs once on import)
+    - Reads from `.env` file in project root
+    - Validates that required variables exist
+    - Returns dictionary with consistent key names
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Fixture Patterns
+
+<Tabs>
+  <Tab title="Fixture with Teardown">
+    Use `yield` for setup and teardown:
+
+    ```python
+    @pytest.fixture
+    def logged_in_page(page):
+        # Setup: Login before test
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login("standard_user", "secret_sauce")
+        
+        yield page  # Test runs here
+        
+        # Teardown: Logout after test
+        page.locator("#logout_sidebar_link").click()
+    ```
+
+    **Usage:**
+    ```python
+    def test_cart_actions(logged_in_page):
+        # Page is already logged in
+        cart = CartPage(logged_in_page)
+        cart.add_product("sauce-labs-backpack")
+        # After test, logout happens automatically
+    ```
+  </Tab>
+
+  <Tab title="Fixture Factory">
+    Return a function to create multiple instances:
+
+    ```python
+    @pytest.fixture
+    def make_cart_page(page):
+        def _make_cart():
+            return CartPage(page)
+        return _make_cart
+
+    def test_multiple_carts(make_cart_page):
+        cart1 = make_cart_page()
+        cart2 = make_cart_page()
+        # Can create multiple instances
+    ```
+  </Tab>
+
+  <Tab title="Fixture Dependencies">
+    Fixtures can use other fixtures:
+
+    ```python
+    @pytest.fixture
+    def login_page(page):
+        return LoginPage(page)
+
+    @pytest.fixture
+    def logged_in_session(login_page, users):
+        # Uses both login_page and users fixtures
+        login_page.navigate()
+        login_page.login(
+            users["validUser"]["username"],
+            users["validUser"]["password"]
+        )
+        return login_page.page
+    ```
+  </Tab>
+
+  <Tab title="Parametrized Fixtures">
+    Create fixtures with multiple values:
+
+    ```python
+    @pytest.fixture(params=[
+        "standard_user",
+        "performance_glitch_user",
+        "visual_user"
+    ])
+    def username(request):
+        return request.param
+
+    def test_login_variations(page, username):
+        # Test runs 3 times, once for each username
+        login_page = LoginPage(page)
+        login_page.login(username, "secret_sauce")
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Descriptive Names">
+    ```python
+    # Good: Clear what it provides
+    @pytest.fixture
+    def valid_user_credentials():
+        return {"username": "standard_user", "password": "secret_sauce"}
+
+    # Avoid: Vague naming
+    @pytest.fixture
+    def data():
+        return {"username": "standard_user", "password": "secret_sauce"}
+    ```
+  </Accordion>
+
+  <Accordion title="Choose Appropriate Scope">
+    ```python
+    # Session: Static data (fast, but shared)
+    @pytest.fixture(scope="session")
+    def users():
+        return load_json("users.json")
+
+    # Function: Fresh instances (slower, but isolated)
+    @pytest.fixture
+    def cart_page(page):
+        return CartPage(page)
+    ```
+  </Accordion>
+
+  <Accordion title="Document Your Fixtures">
+    ```python
+    @pytest.fixture(scope="session")
+    def users():
+        """
+        Loads testData/users.json and returns a dict.
+        Accessible in any test as the 'users' fixture.
+        
+        Structure:
+        {
+            "validUser": {"username": "...", "password": "..."},
+            "invalidUser": {"username": "...", "password": "..."}
+        }
+        """
+        # implementation
+    ```
+  </Accordion>
+
+  <Accordion title="Fail Fast on Errors">
+    ```python
+    @pytest.fixture(scope="session")
+    def creds():
+        user = os.getenv("USERNAME")
+        pwd = os.getenv("PASSWORD")
+        if not user or not pwd:
+            # Clear error message
+            raise RuntimeError("Missing USERNAME/PASSWORD in environment. ")
+        return {"valid_user": user, "pwd": pwd}
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Common Pitfalls
+
+<Warning>
+  **Mutable Fixture Data with Session Scope**
+  
+  ```python
+  # Dangerous: Session-scoped mutable data
+  @pytest.fixture(scope="session")
+  def user_list():
+      return ["user1", "user2"]  # Same list shared across tests
+
+  def test_modify_users(user_list):
+      user_list.append("user3")  # Affects other tests!
+  ```
+
+  **Solution:** Use function scope for mutable data or return copies.
+</Warning>
+
+<Warning>
+  **Forgetting to Use Fixture Parameters**
+  
+  ```python
+  # Wrong: Fixture defined but not used
+  @pytest.fixture
+  def users():
+      return load_json("users.json")
+
+  def test_login(page):  # Missing 'users' parameter
+      # Can't access users fixture!
+  ```
+
+  **Solution:** Add fixture name as test parameter: `def test_login(page, users):`
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Page Object Model" icon="layer-group" href="/concepts/page-object-model">
+    Learn how fixtures work with page objects
+  </Card>
+  <Card title="Test Data" icon="database" href="/concepts/test-data">
+    Explore different ways to manage test data
+  </Card>
+</CardGroup>

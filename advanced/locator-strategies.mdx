@@ -1,0 +1,505 @@
+---
+title: 'Locator Strategies'
+description: 'Master reliable element location techniques for robust test automation'
+icon: 'crosshairs'
+---
+
+## Overview
+
+Choosing the right locator strategy is crucial for creating maintainable, reliable tests. This guide covers proven strategies used in the project, from basic to advanced techniques.
+
+## Locator Hierarchy
+
+Based on the project's `notes.txt` and actual implementation, follow this priority order:
+
+<Steps>
+  <Step title="1. Data-test attributes (Highest Priority)">
+    **Most reliable and maintainable**
+    
+    ```python
+    # From login.py:7-9
+    self.username_input = page.locator('[data-test="username"]')
+    self.password_input = page.locator('[data-test="password"]')
+    self.login_button = page.locator('[data-test="login-button"]')
+    ```
+    
+    <Note>
+      Data-test attributes are specifically designed for testing and won't change with UI updates.
+    </Note>
+  </Step>
+
+  <Step title="2. IDs">
+    **Good for unique elements**
+    
+    ```python
+    # From cart_page.py:8
+    self.checkout_button = page.locator("#checkout")
+    
+    # From test_login.py:16
+    login_button = page.locator("input#login-button")
+    ```
+    
+    Combine element type with ID for more specific selection.
+  </Step>
+
+  <Step title="3. Playwright's built-in methods">
+    **Semantic and accessible**
+    
+    ```python
+    # From test_login.py:10
+    username_input = page.get_by_placeholder("Username")
+    password_input = page.get_by_placeholder("Password")
+    
+    # From test_login.py:19
+    page.get_by_test_id("title").is_visible
+    
+    # From test_login.py:34
+    error_message = page.get_by_text("Epic sadface: Username and password do not match")
+    ```
+  </Step>
+
+  <Step title="4. CSS classes (Use with caution)">
+    **May break with CSS changes**
+    
+    ```python
+    # From cart_page.py:7
+    self.cart_items = page.locator(".cart_item")
+    
+    # From cart_page.py:12
+    self.page.locator(".shopping_cart_link").click()
+    ```
+    
+    <Warning>
+      CSS classes often change during UI refactoring. Use only when no better option exists.
+    </Warning>
+  </Step>
+</Steps>
+
+## Playwright Locator Methods
+
+### Recommended: Built-in Locators
+
+Playwright provides semantic locators that align with how users interact with your application:
+
+<CodeGroup>
+```python get_by_role
+# Best for accessible elements
+page.get_by_role("button", name="Login")
+page.get_by_role("textbox", name="Username")
+page.get_by_role("link", name="Checkout")
+```
+
+```python get_by_test_id
+# Project standard - used throughout
+page.get_by_test_id("title")           # test_login.py:19
+page.get_by_test_id("shopping-cart-link")  # checkout.py:6
+```
+
+```python get_by_placeholder
+# Good for form inputs
+page.get_by_placeholder("Username")    # test_login.py:10
+page.get_by_placeholder("Password")    # test_login.py:13
+```
+
+```python get_by_text
+# For static text and messages
+page.get_by_text("Epic sadface: Username and password do not match")
+# test_login.py:34
+```
+</CodeGroup>
+
+### Dynamic Locators
+
+For elements with dynamic values, use f-strings:
+
+```python
+# From cart_page.py:15-16
+def add_product(self, product_name: str):
+    add_button = self.page.locator(f"#add-to-cart-{product_name}")
+    add_button.click()
+
+# From cart_page.py:20
+def remove_product(self, product_name: str):
+    remove_button = self.page.locator(f"#remove-{product_name}")
+    remove_button.click()
+
+# Usage in test_functionalities.py:22
+cart_page.add_product("sauce-labs-backpack")
+cart_page.add_product("sauce-labs-bike-light")
+```
+
+<Tip>
+  Extract repeated locator patterns into reusable Page Object methods for maintainability.
+</Tip>
+
+## Advanced Locator Techniques
+
+### Chaining Locators
+
+Narrow down elements by chaining locators:
+
+```python
+# From test_functionalities.py:34
+cart_page.cart_badge.locator(".shopping_cart_badge")
+
+# More examples
+page.locator(".product-grid").locator("button", has_text="Add to cart")
+page.get_by_role("list").get_by_role("listitem").first
+```
+
+### Filter by Text
+
+```python
+page.locator("button").filter(has_text="Login")
+page.locator(".product").filter(has_text="Backpack")
+```
+
+### Combining Attributes
+
+```python
+# From test_login.py:16 - combines element type + ID
+login_button = page.locator("input#login-button")
+
+# More examples
+page.locator('button[type="submit"]')
+page.locator('input[name="username"][type="text"]')
+```
+
+### nth and Position
+
+```python
+# Get specific item from list
+page.locator(".cart_item").nth(0)  # First item
+page.locator(".cart_item").first   # Same as nth(0)
+page.locator(".cart_item").last    # Last item
+```
+
+## Page Object Pattern
+
+The project implements the Page Object Model consistently:
+
+<CodeGroup>
+```python login.py
+from playwright.sync_api import Page
+
+class LoginPage:
+    def __init__(self, page):
+        self.page = page
+        # Define all locators in __init__
+        self.username_input = page.locator('[data-test="username"]')
+        self.password_input = page.locator('[data-test="password"]')
+        self.login_button = page.locator('[data-test="login-button"]')
+
+    def navigate(self):
+        self.page.goto("https://www.saucedemo.com/")
+
+    def login(self, username, password):
+        self.username_input.fill(username)
+        self.password_input.fill(password)
+        self.login_button.click()
+```
+
+```python cart_page.py
+class CartPage:
+    def __init__(self, page):
+        self.page = page
+        # Centralize all locators
+        self.cart_badge = page.locator('[data-test="shopping-cart-link"]')
+        self.cart_items = page.locator(".cart_item")
+        self.checkout_button = page.locator("#checkout")
+    
+    def add_product(self, product_name: str):
+        # Dynamic locators as methods
+        add_button = self.page.locator(f"#add-to-cart-{product_name}")
+        add_button.click()
+    
+    def get_cart_count(self) -> int:
+        if self.cart_badge.count() == 0:
+            return 0
+        return int(self.cart_badge.text_content())
+```
+</CodeGroup>
+
+### Page Object Benefits
+
+<CardGroup cols={2}>
+  <Card title="Single Source of Truth" icon="database">
+    All locators defined in one place. Update once, reflect everywhere.
+  </Card>
+  
+  <Card title="Reusability" icon="recycle">
+    Use the same page object across multiple tests (see test_functionalities.py).
+  </Card>
+  
+  <Card title="Readability" icon="book">
+    Tests become more readable: `login_page.login()` vs multiple locator calls.
+  </Card>
+  
+  <Card title="Maintainability" icon="wrench">
+    When UI changes, update only the page object, not every test.
+  </Card>
+</CardGroup>
+
+## Handling Common Scenarios
+
+### Checking Element Visibility
+
+```python
+# From test_login.py:19
+assert page.get_by_test_id("title").is_visible
+
+# From test_login.py:35
+assert error_message.is_visible
+
+# From test_login.py:55
+assert login_button.is_visible()
+```
+
+### Counting Elements
+
+```python
+# From cart_page.py:25-26
+def get_cart_count(self) -> int:
+    if self.cart_badge.count() == 0:
+        return 0
+    return int(self.cart_badge.text_content())
+```
+
+### Working with Lists
+
+```python
+# From cart_page.py:29-30
+def get_cart_items(self):
+    return self.cart_items.all_text_contents()
+```
+
+### Assertions with expect
+
+```python
+from playwright.sync_api import expect
+
+# From test_functionalities.py:24
+expect(cart_page.cart_badge).to_contain_text("2")
+
+# From test_functionalities.py:34
+expect(cart_page.cart_badge.locator(".shopping_cart_badge")).to_be_hidden()
+
+# From test_assertions.py:14-15
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css("color", "rgb(19, 35, 34)")
+expect(page.locator('[data-test="add-to-cart-sauce-labs-backpack"]')).to_have_css("background-color", "rgb(255, 255, 255)")
+```
+
+## Best Practices from the Project
+
+<AccordionGroup>
+  <Accordion title="Prefer data-test attributes">
+    The project consistently uses `data-test` attributes for critical elements:
+    
+    ```python
+    # login.py uses data-test for all inputs
+    page.locator('[data-test="username"]')
+    page.locator('[data-test="password"]')
+    page.locator('[data-test="login-button"]')
+    
+    # Also in checkout.py and cart_page.py
+    page.locator('[data-test="checkout"]')
+    page.locator('[data-test="shopping-cart-link"]')
+    ```
+    
+    This makes tests resilient to CSS and HTML changes.
+  </Accordion>
+
+  <Accordion title="Mix approaches when needed">
+    The project uses different strategies appropriately:
+    
+    - `data-test` for critical user actions (login, checkout)
+    - IDs for unique elements (`#checkout`, `#login-button`)
+    - Classes for lists and collections (`.cart_item`)
+    - `get_by_placeholder` for form inputs
+    - `get_by_text` for error messages
+  </Accordion>
+
+  <Accordion title="Type hints for clarity">
+    ```python
+    # From cart_page.py:14, 18
+    def add_product(self, product_name: str):
+        ...
+    
+    def get_cart_count(self) -> int:
+        ...
+    ```
+    
+    Type hints improve code readability and catch errors early.
+  </Accordion>
+
+  <Accordion title="Guard against missing elements">
+    ```python
+    # From cart_page.py:25-27
+    def get_cart_count(self) -> int:
+        if self.cart_badge.count() == 0:
+            return 0
+        return int(self.cart_badge.text_content())
+    ```
+    
+    Check element existence before accessing properties.
+  </Accordion>
+</AccordionGroup>
+
+## Anti-Patterns to Avoid
+
+<Warning>
+  **Don't use XPath for simple selections**
+  
+  ```python
+  # Avoid
+  page.locator("//input[@id='username']")
+  
+  # Prefer
+  page.locator("#username")
+  page.locator('input[id="username"]')
+  ```
+  
+  XPath is harder to read and maintain. Use CSS selectors or Playwright's built-in methods.
+</Warning>
+
+<Warning>
+  **Don't hardcode waits**
+  
+  ```python
+  # Avoid
+  import time
+  time.sleep(5)
+  
+  # Prefer - Playwright auto-waits
+  page.locator("#button").click()  # Waits automatically
+  expect(page.locator("#result")).to_be_visible()
+  ```
+  
+  Playwright has built-in auto-waiting. Explicit sleeps make tests slow and flaky.
+</Warning>
+
+<Warning>
+  **Don't repeat locators in tests**
+  
+  ```python
+  # Avoid - from early test_login.py versions
+  def test_login(page):
+      page.locator('#username').fill("user")
+      page.locator('#password').fill("pass")
+      page.locator('#login-button').click()
+  
+  # Prefer - use Page Objects
+  def test_login(page):
+      login_page = LoginPage(page)
+      login_page.login("user", "pass")
+  ```
+  
+  See how test_functionalities.py uses page objects vs test_login.py inline locators.
+</Warning>
+
+## Debugging Locators
+
+### Using Playwright Inspector
+
+```bash
+# Run tests in debug mode
+PWDEBUG=1 pytest tests/test_login.py
+
+# Pause at a specific line
+page.pause()  # Add this in your test
+```
+
+### Testing Locators in Console
+
+```python
+# Check if locator matches elements
+print(page.locator(".cart_item").count())
+
+# Get element text
+print(page.locator('[data-test="title"]').text_content())
+
+# Verify attributes
+print(page.locator("#checkout").get_attribute("id"))
+```
+
+### Codegen for Locator Discovery
+
+```bash
+# Launch Playwright codegen
+python -m playwright codegen https://www.saucedemo.com
+```
+
+Codegen suggests locators as you interact with the page.
+
+## Real-World Examples
+
+Examples from the project showing proper locator usage:
+
+### Login Flow
+```python
+# test_functionalities.py:6-11
+def test_successful_login(page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    assert page.get_by_test_id("title").is_visible
+```
+
+### Cart Operations
+```python
+# test_functionalities.py:21-24
+cart_page = CartPage(page)
+cart_page.add_product("sauce-labs-backpack")
+cart_page.add_product("sauce-labs-bike-light")
+expect(cart_page.cart_badge).to_contain_text("2")
+```
+
+### Parametrized Tests
+```python
+# test_login.py:58-76
+@pytest.mark.parametrize("username, password", [
+    ("error_user", "secret_sauce"),
+    ("performance_glitch_user", "secret_sauce"),
+    ("visual_user", "secret_sauce")
+])
+def test_multiple_users(page: Page, username, password):
+    page.goto(URL)
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill(username)
+    # ...
+```
+
+## Summary
+
+<CardGroup cols={2}>
+  <Card title="Priority Order" icon="list-ol">
+    1. data-test attributes
+    2. IDs
+    3. Playwright methods
+    4. CSS classes (last resort)
+  </Card>
+  
+  <Card title="Page Objects" icon="file-code">
+    Centralize locators in page objects for maintainability
+  </Card>
+  
+  <Card title="Auto-waiting" icon="clock">
+    Trust Playwright's auto-waiting. Avoid explicit sleeps
+  </Card>
+  
+  <Card title="Semantic Locators" icon="universal-access">
+    Use get_by_role, get_by_placeholder for accessible tests
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="/advanced/best-practices">
+    Learn overall testing best practices
+  </Card>
+  
+  <Card title="CI/CD Integration" icon="rocket" href="/advanced/ci-cd">
+    Automate your tests with GitHub Actions
+  </Card>
+</CardGroup>

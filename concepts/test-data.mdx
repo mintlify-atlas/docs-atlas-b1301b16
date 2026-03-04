@@ -1,0 +1,653 @@
+---
+title: 'Test Data Management'
+description: 'Learn best practices for managing test data using JSON files, environment variables, and fixtures'
+icon: 'database'
+---
+
+## Why Separate Test Data?
+
+Separating test data from test logic offers several key benefits:
+
+<CardGroup cols={2}>
+  <Card title="Maintainability" icon="wrench">
+    Update data in one place without touching test code
+  </Card>
+  <Card title="Reusability" icon="arrows-rotate">
+    Share data across multiple tests and test suites
+  </Card>
+  <Card title="Security" icon="shield">
+    Keep sensitive credentials out of source code
+  </Card>
+  <Card title="Scalability" icon="chart-line">
+    Easily add new test scenarios by adding data
+  </Card>
+</CardGroup>
+
+## Test Data Approaches
+
+Our test suite demonstrates three common approaches to test data management:
+
+<Tabs>
+  <Tab title="JSON Files">
+    **Best for:** Structured, static test data that's reused across tests
+
+    ```json testData/users.json
+    {
+      "validUser": { "username": "standard_user", "password": "secret_sauce" },
+      "invalidUser": { "username": "locked_out_user", "password": "secret_sauce" }
+    }
+    ```
+
+    <Note>
+      JSON files are ideal for maintaining multiple test scenarios with different data sets.
+    </Note>
+  </Tab>
+
+  <Tab title="Environment Variables">
+    **Best for:** Sensitive data like credentials, API keys, or environment-specific URLs
+
+    ```bash .env
+    USERNAME=standard_user
+    PASSWORD=secret_sauce
+    BASE_URL=https://www.saucedemo.com
+    ```
+
+    <Warning>
+      Always add `.env` to `.gitignore` to prevent committing sensitive data!
+    </Warning>
+  </Tab>
+
+  <Tab title="Hardcoded (Not Recommended)">
+    **Avoid when possible:** Data embedded directly in test code
+
+    ```python
+    def test_login(page):
+        # Data hardcoded in test
+        username = "standard_user"
+        password = "secret_sauce"
+        page.goto("https://www.saucedemo.com/")
+    ```
+
+    **Problems:**
+    - Hard to maintain
+    - Data duplicated across tests
+    - Can't easily test different scenarios
+  </Tab>
+</Tabs>
+
+## JSON Test Data
+
+### Structure and Organization
+
+Let's examine our actual test data file:
+
+```json testData/users.json
+{
+  "validUser": { "username": "standard_user", "password": "secret_sauce" },
+  "invalidUser": { "username": "locked_out_user", "password": "secret_sauce" }
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Data Structure">
+    The JSON uses a **keyed dictionary** approach:
+    - Top-level keys: `validUser`, `invalidUser`
+    - Each key contains an object with related fields
+    - Easy to access specific test scenarios: `users["validUser"]`
+
+    **Benefits:**
+    - Self-documenting (key names explain the data)
+    - Easy to extend with new user types
+    - Type-safe access in tests
+  </Accordion>
+
+  <Accordion title="Alternative Structures">
+    You could also organize data as arrays:
+
+    ```json
+    {
+      "users": [
+        {"type": "valid", "username": "standard_user", "password": "secret_sauce"},
+        {"type": "invalid", "username": "locked_out_user", "password": "secret_sauce"}
+      ]
+    }
+    ```
+
+    Or grouped by test type:
+
+    ```json
+    {
+      "login": {
+        "valid": {"username": "standard_user", "password": "secret_sauce"},
+        "invalid": {"username": "locked_out_user", "password": "secret_sauce"}
+      },
+      "products": [
+        {"id": "sauce-labs-backpack", "name": "Sauce Labs Backpack"},
+        {"id": "sauce-labs-bike-light", "name": "Sauce Labs Bike Light"}
+      ]
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Loading JSON Data with Fixtures
+
+Here's how our test suite loads JSON data:
+
+```python tests/conftest.py
+import json
+from pathlib import Path
+import pytest
+
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    root = Path(__file__).parent.parent  # go from /tests to project root
+    data_path = root / "testData" / "users.json"
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+```
+
+<Steps>
+  <Step title="Locate the Data File">
+    ```python
+    root = Path(__file__).parent.parent  # Navigate to project root
+    data_path = root / "testData" / "users.json"
+    ```
+    Uses `Path` for cross-platform compatibility
+  </Step>
+
+  <Step title="Open and Parse">
+    ```python
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+    ```
+    Reads file and parses JSON into Python dictionary
+  </Step>
+
+  <Step title="Use in Tests">
+    ```python
+    def test_with_testdata(page, users):
+        # users is automatically provided by pytest
+        username = users["validUser"]["username"]
+        password = users["validUser"]["password"]
+    ```
+  </Step>
+</Steps>
+
+### Using JSON Data in Tests
+
+Real example from our test suite:
+
+```python tests/test_functionalities.py
+from pages.login import LoginPage
+
+def test_with_testdata(page, users):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(users["validUser"]["username"], users["validUser"]["password"])
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+**How it works:**
+
+1. Test declares `users` parameter
+2. pytest calls the `users` fixture from conftest.py:line_8
+3. Fixture loads and parses testData/users.json:line_1
+4. Test accesses nested data: `users["validUser"]["username"]`
+5. Values passed to page object methods
+
+<Info>
+  The fixture uses `scope="session"` so the JSON file is only loaded once for all tests, improving performance.
+</Info>
+
+## Environment Variables
+
+### Setting Up Environment Variables
+
+<Tabs>
+  <Tab title=".env File">
+    Create a `.env` file in your project root:
+
+    ```bash .env
+    USERNAME=standard_user
+    PASSWORD=secret_sauce
+    BASE_URL=https://www.saucedemo.com
+    API_KEY=your_secret_api_key_here
+    ```
+
+    <Warning>
+      **Security Best Practice:** Always add `.env` to your `.gitignore`:
+      ```bash .gitignore
+      .env
+      .env.local
+      *.env
+      ```
+    </Warning>
+  </Tab>
+
+  <Tab title="CI/CD Environment">
+    In CI/CD pipelines, set environment variables through the platform:
+
+    **GitHub Actions:**
+    ```yaml .github/workflows/test.yml
+    env:
+      USERNAME: ${{ secrets.TEST_USERNAME }}
+      PASSWORD: ${{ secrets.TEST_PASSWORD }}
+    ```
+
+    **GitLab CI:**
+    ```yaml .gitlab-ci.yml
+    variables:
+      USERNAME: "standard_user"
+      PASSWORD: "secret_sauce"
+    ```
+  </Tab>
+
+  <Tab title="Shell Export">
+    For local testing without `.env` file:
+
+    ```bash
+    export USERNAME="standard_user"
+    export PASSWORD="secret_sauce"
+    pytest tests/
+    ```
+
+    Or inline:
+    ```bash
+    USERNAME=standard_user PASSWORD=secret_sauce pytest tests/
+    ```
+  </Tab>
+</Tabs>
+
+### Loading Environment Variables
+
+Our conftest.py demonstrates best practices:
+
+```python tests/conftest.py
+import os
+from pathlib import Path
+import pytest
+from dotenv import load_dotenv
+
+# Load .env file at module level
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+@pytest.fixture(scope="session")
+def creds():
+    """
+    Provides credentials from environment variables.
+    Fails early with a clear message if missing.
+    """
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment. ")
+    return {"valid_user": user, "pwd": pwd}
+```
+
+<AccordionGroup>
+  <Accordion title="Loading .env File">
+    ```python
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+    ```
+
+    - Called at **module level** (runs when conftest.py is imported)
+    - Loads variables from `.env` into `os.environ`
+    - Explicit path ensures correct file is loaded
+  </Accordion>
+
+  <Accordion title="Accessing Variables">
+    ```python
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    ```
+
+    - `os.getenv()` returns `None` if variable not found
+    - Better than `os.environ["KEY"]` which raises KeyError
+    - Can provide default: `os.getenv("API_URL", "https://api.example.com")`
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    ```python
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment. ")
+    ```
+
+    **Why fail early?**
+    - Tests won't run with invalid setup
+    - Clear error message for developers
+    - Prevents cryptic failures later in test execution
+  </Accordion>
+
+  <Accordion title="Return Structure">
+    ```python
+    return {"valid_user": user, "pwd": pwd}
+    ```
+
+    Returns a dictionary for consistent access pattern:
+    ```python
+    # In test
+    creds["valid_user"]  # Always works
+    creds["pwd"]         # Always works
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Using Environment Variables in Tests
+
+```python tests/test_functionalities.py
+from pages.login import LoginPage
+
+def test_login_with_env_vars(page, creds):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(creds["valid_user"], creds["pwd"])
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+**Flow:**
+
+1. Test requests `creds` fixture
+2. Fixture reads from environment variables
+3. If missing, raises `RuntimeError` immediately
+4. If found, returns dictionary with credentials
+5. Test uses credentials without knowing their source
+
+<Note>
+  This approach allows the same test to work in different environments (local, CI/CD, staging) by simply changing environment variables.
+</Note>
+
+## Comparison: JSON vs Environment Variables
+
+<Tabs>
+  <Tab title="JSON Test Data">
+    ```python
+    def test_with_testdata(page, users):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login(
+            users["validUser"]["username"],
+            users["validUser"]["password"]
+        )
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    **Pros:**
+    - Structured data with multiple scenarios
+    - Easy to add new test cases
+    - Version controlled (safe to commit)
+    - Great for data-driven testing
+
+    **Cons:**
+    - Not suitable for secrets
+    - Less flexible across environments
+  </Tab>
+
+  <Tab title="Environment Variables">
+    ```python
+    def test_login_with_env_vars(page, creds):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login(creds["valid_user"], creds["pwd"])
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    **Pros:**
+    - Secure (not in source control)
+    - Environment-specific configuration
+    - Easy to change without code changes
+    - Standard practice for secrets
+
+    **Cons:**
+    - Harder to manage many values
+    - Less structured than JSON
+    - Requires setup in each environment
+  </Tab>
+</Tabs>
+
+## Advanced Patterns
+
+<Tabs>
+  <Tab title="Parametrized Tests with Data">
+    Use `@pytest.mark.parametrize` for data-driven testing:
+
+    ```python tests/test_login.py
+    @pytest.mark.parametrize("username, password",[
+        ("error_user","secret_sauce"),
+        ("performance_glitch_user","secret_sauce"),
+        ("visual_user","secret_sauce")])
+
+    def test_multiple_users(page: Page, username, password):
+        page.goto("https://www.saucedemo.com/")
+        
+        username_input = page.get_by_placeholder("Username")
+        username_input.fill(username)
+
+        password_input = page.get_by_placeholder("Password")
+        password_input.fill(password)
+
+        login_button = page.locator("input#login-button")
+        login_button.click()
+
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    Test runs **3 times**, once for each parameter set.
+  </Tab>
+
+  <Tab title="Dynamic Product Data">
+    In our CartPage, product names are dynamic:
+
+    ```python pages/cart_page.py
+    def add_product(self, product_name: str):
+        add_button = self.page.locator(f"#add-to-cart-{product_name}")
+        add_button.click()
+
+    def remove_product(self, product_name: str):
+        remove_button = self.page.locator(f"#remove-{product_name}")
+        remove_button.click()
+    ```
+
+    Used in tests:
+    ```python tests/test_functionalities.py
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    ```
+
+    **Could be improved with JSON data:**
+    ```json
+    {
+      "products": [
+        {"id": "sauce-labs-backpack", "name": "Sauce Labs Backpack"},
+        {"id": "sauce-labs-bike-light", "name": "Sauce Labs Bike Light"}
+      ]
+    }
+    ```
+  </Tab>
+
+  <Tab title="Combining Both Approaches">
+    Use JSON for data, environment variables for config:
+
+    ```python
+    @pytest.fixture(scope="session")
+    def test_config():
+        return {
+            "base_url": os.getenv("BASE_URL", "https://www.saucedemo.com"),
+            "timeout": int(os.getenv("TIMEOUT", "30000")),
+            "headless": os.getenv("HEADLESS", "true").lower() == "true"
+        }
+
+    @pytest.fixture(scope="session")
+    def test_users():
+        data_path = Path(__file__).parent.parent / "testData" / "users.json"
+        with data_path.open() as f:
+            return json.load(f)
+
+    def test_configurable_login(page, test_config, test_users):
+        page.goto(test_config["base_url"])
+        # Use both fixtures together
+    ```
+  </Tab>
+
+  <Tab title="Test Data Builders">
+    Create helper functions to generate test data:
+
+    ```python
+    def build_user(username=None, password=None):
+        return {
+            "username": username or "standard_user",
+            "password": password or "secret_sauce"
+        }
+
+    def test_with_builder(page):
+        # Use default values
+        user = build_user()
+        
+        # Or override specific fields
+        invalid_user = build_user(password="wrong")
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Choose the Right Storage Method">
+    | Data Type | Storage Method |
+    |-----------|----------------|
+    | User credentials (test accounts) | JSON file (if not sensitive) or Environment Variables |
+    | API keys, tokens | Environment Variables only |
+    | Product catalogs | JSON file |
+    | Test URLs | Environment Variables (environment-specific) |
+    | Form field values | JSON file |
+    | Configuration flags | Environment Variables |
+  </Accordion>
+
+  <Accordion title="Structure JSON Logically">
+    ```json
+    // Good: Grouped by purpose
+    {
+      "users": {
+        "valid": {"username": "standard_user", "password": "secret_sauce"},
+        "locked": {"username": "locked_out_user", "password": "secret_sauce"}
+      },
+      "products": {
+        "backpack": {"id": "sauce-labs-backpack", "price": 29.99},
+        "bikeLight": {"id": "sauce-labs-bike-light", "price": 9.99}
+      }
+    }
+
+    // Avoid: Flat structure
+    {
+      "validUsername": "standard_user",
+      "validPassword": "secret_sauce",
+      "backpackId": "sauce-labs-backpack",
+      "backpackPrice": 29.99
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Validate Data Early">
+    ```python
+    @pytest.fixture(scope="session")
+    def users():
+        root = Path(__file__).parent.parent
+        data_path = root / "testData" / "users.json"
+        
+        if not data_path.exists():
+            raise FileNotFoundError(f"Test data not found: {data_path}")
+        
+        with data_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # Validate structure
+        required_keys = ["validUser", "invalidUser"]
+        for key in required_keys:
+            if key not in data:
+                raise ValueError(f"Missing required key in users.json: {key}")
+        
+        return data
+    ```
+  </Accordion>
+
+  <Accordion title="Document Data Structure">
+    Add comments to JSON (if using JSON5) or in fixture docstrings:
+
+    ```python
+    @pytest.fixture(scope="session")
+    def users():
+        """
+        Loads testData/users.json and returns a dict.
+        
+        Expected structure:
+        {
+            "validUser": {
+                "username": str,
+                "password": str
+            },
+            "invalidUser": {
+                "username": str,
+                "password": str
+            }
+        }
+        """
+        # implementation
+    ```
+  </Accordion>
+
+  <Accordion title="Use Type Hints">
+    ```python
+    from typing import Dict, Any
+
+    @pytest.fixture(scope="session")
+    def users() -> Dict[str, Dict[str, str]]:
+        root = Path(__file__).parent.parent
+        data_path = root / "testData" / "users.json"
+        with data_path.open(encoding="utf-8") as f:
+            return json.load(f)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Project Structure Example
+
+```
+source/
+├── .env                      # Environment variables (DO NOT COMMIT)
+├── .env.example              # Template for .env
+├── .gitignore                # Include .env here
+├── pages/
+│   ├── login.py
+│   └── cart_page.py
+├── testData/
+│   ├── users.json           # User test data
+│   ├── products.json        # Product catalog
+│   └── forms.json           # Form field data
+└── tests/
+    ├── conftest.py          # Fixtures for loading data
+    ├── test_login.py
+    └── test_functionalities.py
+```
+
+<Note>
+  Keep test data files in a dedicated `testData/` directory separate from test code for better organization.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Page Object Model" icon="layer-group" href="/concepts/page-object-model">
+    See how test data integrates with page objects
+  </Card>
+  <Card title="Fixtures" icon="flask" href="/concepts/fixtures">
+    Deep dive into fixture patterns for test data
+  </Card>
+</CardGroup>

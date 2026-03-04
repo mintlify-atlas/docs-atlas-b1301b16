@@ -1,0 +1,174 @@
+---
+title: 'CartPage'
+description: 'Page Object for managing shopping cart operations'
+---
+
+## Overview
+
+The `CartPage` class provides methods for interacting with the shopping cart functionality, including adding/removing products, navigating to the cart, and checking cart contents.
+
+## Initialization
+
+```python
+from pages.cart_page import CartPage
+from playwright.sync_api import Page
+
+cart_page = CartPage(page)
+```
+
+<ParamField path="page" type="Page" required>
+  Playwright Page object for browser interaction
+</ParamField>
+
+## Locators
+
+The CartPage class defines the following locators:
+
+| Locator | Selector | Description |
+|---------|----------|-------------|
+| `cart_badge` | `[data-test="shopping-cart-link"]` | Shopping cart badge showing item count |
+| `cart_items` | `.cart_item` | All cart item elements |
+| `checkout_button` | `#checkout` | Checkout button |
+
+## Methods
+
+### go_to_cart()
+
+Navigates to the shopping cart page by clicking the cart icon.
+
+```python
+cart_page = CartPage(page)
+cart_page.go_to_cart()
+```
+
+**Returns:** `None`
+
+---
+
+### add_product(product_name)
+
+Adds a product to the cart by its product name identifier.
+
+```python
+cart_page.add_product("sauce-labs-backpack")
+cart_page.add_product("sauce-labs-bike-light")
+```
+
+<ParamField path="product_name" type="str" required>
+  The product identifier used in the `add-to-cart-{product_name}` button ID
+</ParamField>
+
+**Returns:** `None`
+
+---
+
+### remove_product(product_name)
+
+Removes a product from the cart by its product name identifier.
+
+```python
+cart_page.remove_product("sauce-labs-backpack")
+```
+
+<ParamField path="product_name" type="str" required>
+  The product identifier used in the `remove-{product_name}` button ID
+</ParamField>
+
+**Returns:** `None`
+
+---
+
+### get_cart_count()
+
+Returns the number of items currently in the cart.
+
+```python
+count = cart_page.get_cart_count()
+print(f"Cart has {count} items")
+```
+
+**Returns:** `int` - The number of items in the cart, or 0 if the cart is empty
+
+---
+
+### get_cart_items()
+
+Returns all text contents of cart items.
+
+```python
+items = cart_page.get_cart_items()
+for item in items:
+    print(item)
+```
+
+**Returns:** `list` - List of text contents from all cart items
+
+## Usage Examples
+
+### Add and Remove Products
+
+```python
+from pages.login import LoginPage
+from pages.cart_page import CartPage
+from playwright.sync_api import expect
+
+def test_add_remove_products(page):
+    # Login first
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    
+    # Add products to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    expect(cart_page.cart_badge).to_contain_text("2")
+    
+    # Go to cart
+    cart_page.go_to_cart()
+    
+    # Remove products from cart
+    cart_page.remove_product("sauce-labs-backpack")
+    cart_page.remove_product("sauce-labs-bike-light")
+    
+    # Assert cart_badge no longer exists
+    expect(cart_page.cart_badge.locator(".shopping_cart_badge")).to_be_hidden()
+```
+
+### Check Cart Count
+
+```python
+def test_cart_count(page):
+    cart_page = CartPage(page)
+    
+    # Add multiple products
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    cart_page.add_product("sauce-labs-fleece-jacket")
+    
+    # Verify count
+    assert cart_page.get_cart_count() == 3
+```
+
+### Checkout Flow with Cart
+
+```python
+def test_checkout_process(page):
+    # Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    
+    # Add products to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    expect(cart_page.cart_badge).to_contain_text("2")
+    
+    # Go to cart and proceed to checkout
+    cart_page.go_to_cart()
+```
+
+## Source Code
+
+Location: `/home/daytona/workspace/source/pages/cart_page.py:3`

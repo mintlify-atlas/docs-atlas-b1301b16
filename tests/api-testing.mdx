@@ -1,0 +1,380 @@
+---
+title: API Testing with Playwright
+description: Test REST APIs directly using Playwright's API testing capabilities with real-world examples
+icon: code
+---
+
+## Overview
+
+API testing validates backend functionality without a browser. Playwright includes powerful API testing capabilities that let you test REST APIs, verify responses, and validate data structures.
+
+## Setting Up API Context
+
+Before making API requests, create an API context with your base URL and configuration:
+
+```python conftest.py (Lines 5-11)
+import pytest
+from playwright.sync_api import Playwright, APIRequestContext
+
+@pytest.fixture
+def api_context(playwright: Playwright) -> APIRequestContext:
+    api_context = playwright.request.new_context(
+        base_url="https://dummyjson.com"
+    )
+    yield api_context
+    api_context.dispose()
+```
+
+<Steps>
+  <Step title="Create fixture">
+    Define a pytest fixture that provides the API context to your tests
+  </Step>
+  <Step title="Configure base URL">
+    Set the `base_url` so you can use relative paths in requests
+  </Step>
+  <Step title="Yield context">
+    Use `yield` to provide the context to tests
+  </Step>
+  <Step title="Cleanup">
+    Call `dispose()` to clean up resources after tests complete
+  </Step>
+</Steps>
+
+<Note>
+  The `@pytest.fixture` decorator makes the API context available to any test that includes `api_context` as a parameter.
+</Note>
+
+## Making GET Requests
+
+GET requests retrieve data from your API. Here's a complete example:
+
+```python test_API.py (Lines 14-24)
+def test_users_search(api_context: APIRequestContext):
+    query = "Emily"
+    response = api_context.get(f"/users/search?q={query}")
+
+    users_data = response.json()
+
+    print("Users found:", users_data["total"])
+
+    for user in users_data["users"]:
+        print("Checking user:", user["firstName"])
+        assert query in user["firstName"]
+```
+
+<CodeGroup>
+
+```python Simple GET
+response = api_context.get("/users")
+data = response.json()
+```
+
+```python GET with Query Parameters
+query = "Emily"
+response = api_context.get(f"/users/search?q={query}")
+```
+
+```python GET with Headers
+response = api_context.get(
+    "/users",
+    headers={"Authorization": "Bearer token123"}
+)
+```
+
+</CodeGroup>
+
+## Making POST Requests
+
+POST requests create new resources. Include data in the request body:
+
+```python test_API.py (Lines 26-36)
+def test_create_user(api_context: APIRequestContext):
+    response = api_context.post(
+        "users/add",
+        headers={"Content-Type": "application/json"},
+        data={"firstName": "Damien", "lastName": "Smith", "age": 27}
+    )
+
+    user_data = response.json()
+    assert user_data["id"] == 209
+    assert user_data["firstName"] == "Damien"
+    print(f"\n {user_data}")
+```
+
+<Accordion title="Request Methods Explained">
+  <ResponseField name="GET" type="method">
+    Retrieve data without modifying it. Use for reading resources.
+  </ResponseField>
+  <ResponseField name="POST" type="method">
+    Create new resources. Send data in the request body.
+  </ResponseField>
+  <ResponseField name="PUT" type="method">
+    Update entire resources. Replaces all fields.
+  </ResponseField>
+  <ResponseField name="PATCH" type="method">
+    Partially update resources. Only modifies specified fields.
+  </ResponseField>
+  <ResponseField name="DELETE" type="method">
+    Remove resources permanently.
+  </ResponseField>
+</Accordion>
+
+## Validating Responses
+
+Always validate both the response status and data structure:
+
+<CodeGroup>
+
+```python Status Codes
+# Check status code
+assert response.status == 200
+assert response.ok  # True for 2xx status codes
+
+# Test error cases
+response = api_context.get("/invalid-endpoint")
+assert response.status == 404
+```
+
+```python Response Body
+# Parse JSON response
+data = response.json()
+
+# Validate structure
+assert "id" in data
+assert "firstName" in data
+assert isinstance(data["age"], int)
+
+# Validate values
+assert data["firstName"] == "Damien"
+assert data["age"] > 0
+```
+
+```python Response Headers
+# Check content type
+assert "application/json" in response.headers["content-type"]
+
+# Check custom headers
+assert "x-api-version" in response.headers
+```
+
+</CodeGroup>
+
+## Working with Response Data
+
+Parse and validate complex API responses:
+
+```python test_API.py (Lines 38-42)
+def test_count_users(api_context: APIRequestContext):
+    response = api_context.get("/users")
+    user_data = response.json()
+
+    print(f"\n Total users : {user_data['total']}")
+```
+
+<Tabs>
+  <Tab title="JSON Responses">
+    ```python
+    # Parse JSON
+    data = response.json()
+    
+    # Access nested data
+    total = data["total"]
+    users = data["users"]
+    
+    # Iterate through arrays
+    for user in data["users"]:
+        print(user["firstName"])
+    ```
+  </Tab>
+  <Tab title="Text Responses">
+    ```python
+    # Get response as text
+    text = response.text()
+    
+    # Check for specific content
+    assert "Success" in text
+    ```
+  </Tab>
+  <Tab title="Binary Responses">
+    ```python
+    # Download files or binary data
+    body = response.body()
+    
+    # Save to file
+    with open("download.pdf", "wb") as f:
+        f.write(body)
+    ```
+  </Tab>
+</Tabs>
+
+## Complete API Test Examples
+
+### Testing Search Functionality
+
+```python
+def test_users_search(api_context: APIRequestContext):
+    """Test that search returns only matching users"""
+    query = "Emily"
+    response = api_context.get(f"/users/search?q={query}")
+    
+    # Verify successful response
+    assert response.ok
+    
+    # Parse and validate data
+    users_data = response.json()
+    assert users_data["total"] > 0
+    
+    # Verify all results match search query
+    for user in users_data["users"]:
+        assert query in user["firstName"]
+```
+
+### Testing Resource Creation
+
+```python
+def test_create_user(api_context: APIRequestContext):
+    """Test creating a new user via POST"""
+    new_user = {
+        "firstName": "Damien",
+        "lastName": "Smith",
+        "age": 27
+    }
+    
+    response = api_context.post(
+        "users/add",
+        headers={"Content-Type": "application/json"},
+        data=new_user
+    )
+    
+    # Verify creation was successful
+    assert response.ok
+    
+    # Validate returned user data
+    user_data = response.json()
+    assert user_data["id"] is not None
+    assert user_data["firstName"] == new_user["firstName"]
+    assert user_data["lastName"] == new_user["lastName"]
+    assert user_data["age"] == new_user["age"]
+```
+
+<Warning>
+  **Important**: Many test APIs like DummyJSON simulate operations but don't persist data. Always check API documentation to understand behavior.
+</Warning>
+
+## Authentication in API Tests
+
+Handle authentication tokens and headers:
+
+<CodeGroup>
+
+```python Bearer Token
+@pytest.fixture
+def authenticated_api_context(playwright: Playwright):
+    token = "your-auth-token"
+    api_context = playwright.request.new_context(
+        base_url="https://api.example.com",
+        extra_http_headers={
+            "Authorization": f"Bearer {token}"
+        }
+    )
+    yield api_context
+    api_context.dispose()
+```
+
+```python Basic Auth
+api_context = playwright.request.new_context(
+    base_url="https://api.example.com",
+    http_credentials={
+        "username": "user",
+        "password": "pass"
+    }
+)
+```
+
+```python API Key
+api_context = playwright.request.new_context(
+    base_url="https://api.example.com",
+    extra_http_headers={
+        "X-API-Key": "your-api-key"
+    }
+)
+```
+
+</CodeGroup>
+
+## Error Handling
+
+Test how your API handles errors:
+
+```python
+def test_invalid_endpoint(api_context: APIRequestContext):
+    """Test that invalid endpoints return 404"""
+    response = api_context.get("/nonexistent")
+    assert response.status == 404
+
+def test_invalid_data(api_context: APIRequestContext):
+    """Test that invalid data is rejected"""
+    response = api_context.post(
+        "users/add",
+        data={"invalid": "data"}
+    )
+    assert response.status == 400  # Bad Request
+
+def test_unauthorized_access(api_context: APIRequestContext):
+    """Test that protected endpoints require authentication"""
+    response = api_context.get("/protected-resource")
+    assert response.status == 401  # Unauthorized
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Fixtures" icon="puzzle-piece">
+    Create reusable fixtures for API contexts to avoid repetition
+  </Card>
+  <Card title="Test All Status Codes" icon="traffic-light">
+    Verify both success (2xx) and error (4xx, 5xx) responses
+  </Card>
+  <Card title="Validate Data Structure" icon="sitemap">
+    Check that responses contain expected fields and types
+  </Card>
+  <Card title="Clean Up Resources" icon="broom">
+    Delete test data created during API tests
+  </Card>
+</CardGroup>
+
+<Tip>
+  **Pro Tip**: Combine API and UI tests. Use API calls to set up test data quickly, then verify the UI displays it correctly.
+</Tip>
+
+## Debugging API Tests
+
+```python
+# Print response details for debugging
+response = api_context.get("/users")
+print(f"Status: {response.status}")
+print(f"Headers: {response.headers}")
+print(f"Body: {response.text()}")
+
+# Pretty print JSON responses
+import json
+data = response.json()
+print(json.dumps(data, indent=2))
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="UI Testing" icon="browser" href="/tests/ui-testing">
+    Learn browser-based UI testing
+  </Card>
+  <Card title="Assertions" icon="check" href="/tests/assertions">
+    Master assertion techniques
+  </Card>
+  <Card title="Parametrization" icon="table" href="/tests/parametrization">
+    Test with multiple data sets
+  </Card>
+  <Card title="Fixtures" icon="wrench" href="/concepts/fixtures">
+    Deep dive into pytest fixtures
+  </Card>
+</CardGroup>

@@ -1,0 +1,459 @@
+---
+title: Test Parametrization
+description: Run the same test with multiple data sets using pytest parametrization and fixtures
+icon: table
+---
+
+## Overview
+
+Test parametrization allows you to run the same test logic with different input values, reducing code duplication and increasing test coverage. This guide shows you how to use pytest's `@pytest.mark.parametrize` decorator and fixture-based parametrization.
+
+## Why Parametrize Tests?
+
+<CardGroup cols={2}>
+  <Card title="Reduce Duplication" icon="clone">
+    Write test logic once, run it with multiple datasets
+  </Card>
+  <Card title="Increase Coverage" icon="chart-line">
+    Test more scenarios without writing more code
+  </Card>
+  <Card title="Better Reporting" icon="list">
+    Each parameter set runs as a separate test case
+  </Card>
+  <Card title="Easy Maintenance" icon="wrench">
+    Update test logic in one place for all data variations
+  </Card>
+</CardGroup>
+
+## Basic Parametrization
+
+Use `@pytest.mark.parametrize` to run a test with multiple parameter values:
+
+```python test_login.py (Lines 58-76)
+@pytest.mark.parametrize("username, password",[
+    ("error_user","secret_sauce"),
+    ("performance_glitch_user","secret_sauce"),
+    ("visual_user","secret_sauce")])
+
+def test_multiple_users(page: Page, username, password):
+    page.goto(URL)
+    
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill(username)
+
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill(password)
+
+    login_button = page.locator("input#login-button")
+    login_button.click()
+
+    assert page.get_by_test_id("title").is_visible
+    assert page.url == login_dashboard
+```
+
+<Note>
+  This single test function runs **3 times**, once for each set of username/password parameters. Each run appears as a separate test in your test results.
+</Note>
+
+## Parametrization Syntax
+
+<Steps>
+  <Step title="Add the decorator">
+    Place `@pytest.mark.parametrize` above your test function
+  </Step>
+  <Step title="Specify parameter names">
+    First argument is a string with comma-separated parameter names: `"username, password"`
+  </Step>
+  <Step title="Provide test data">
+    Second argument is a list of tuples, each containing one set of values
+  </Step>
+  <Step title="Use parameters in test">
+    Add parameters to the test function signature and use them in your test logic
+  </Step>
+</Steps>
+
+## Multiple Parameter Combinations
+
+<Tabs>
+  <Tab title="Two Parameters">
+    ```python
+    @pytest.mark.parametrize("username, password", [
+        ("error_user", "secret_sauce"),
+        ("performance_glitch_user", "secret_sauce"),
+        ("visual_user", "secret_sauce")
+    ])
+    def test_multiple_users(page, username, password):
+        # Test runs 3 times
+        pass
+    ```
+  </Tab>
+  <Tab title="Three Parameters">
+    ```python
+    @pytest.mark.parametrize("username, password, expected_url", [
+        ("standard_user", "secret_sauce", "/inventory.html"),
+        ("problem_user", "secret_sauce", "/inventory.html"),
+        ("performance_glitch_user", "secret_sauce", "/inventory.html")
+    ])
+    def test_login_variations(page, username, password, expected_url):
+        # Test runs 3 times with different expected URLs
+        pass
+    ```
+  </Tab>
+  <Tab title="Single Parameter">
+    ```python
+    @pytest.mark.parametrize("username", [
+        "error_user",
+        "performance_glitch_user",
+        "visual_user"
+    ])
+    def test_user_exists(page, username):
+        # Test runs 3 times
+        # Note: Single values don't need tuples
+        pass
+    ```
+  </Tab>
+</Tabs>
+
+## Parametrizing with Test IDs
+
+Add custom test IDs to make test output more readable:
+
+```python
+@pytest.mark.parametrize(
+    "username, password",
+    [
+        ("error_user", "secret_sauce"),
+        ("performance_glitch_user", "secret_sauce"),
+        ("visual_user", "secret_sauce")
+    ],
+    ids=["error-user", "performance-user", "visual-user"]
+)
+def test_multiple_users(page, username, password):
+    # Test output will show readable names:
+    # test_multiple_users[error-user] PASSED
+    # test_multiple_users[performance-user] PASSED
+    # test_multiple_users[visual-user] PASSED
+    pass
+```
+
+<Tip>
+  Custom IDs make it much easier to identify which parameter set failed when reading test reports.
+</Tip>
+
+## Using Fixtures for Test Data
+
+Load test data from external files using pytest fixtures:
+
+### JSON File Fixture
+
+```python conftest.py (Lines 8-17)
+import json
+from pathlib import Path
+import pytest
+
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    root = Path(__file__).parent.parent
+    data_path = root / "testData" / "users.json"
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+```
+
+```json testData/users.json
+{
+  "validUser": { "username": "standard_user", "password": "secret_sauce" },
+  "invalidUser": { "username": "locked_out_user", "password": "secret_sauce" }
+}
+```
+
+### Using the Fixture
+
+```python test_functionalities.py (Lines 59-64)
+def test_with_testdata(page, users):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(users["validUser"]["username"], users["validUser"]["password"])
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+<Accordion title="Why use fixture-based test data?">
+  - **Centralized Data**: All test data in one place
+  - **Easy Updates**: Change data without modifying test code
+  - **Reusable**: Same data across multiple tests
+  - **Type Safety**: JSON, YAML, CSV - choose what fits your needs
+  - **Version Control**: Track test data changes separately
+</Accordion>
+
+## Environment Variables for Test Data
+
+Use environment variables for sensitive data like credentials:
+
+```python conftest.py (Lines 19-31)
+import os
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+@pytest.fixture(scope="session")
+def creds():
+    """
+    Provides credentials from environment variables.
+    Fails early with a clear message if missing.
+    """
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment.")
+    return {"valid_user": user, "pwd": pwd}
+```
+
+```python test_functionalities.py (Lines 66-72)
+def test_login_with_env_vars(page, creds):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(creds["valid_user"], creds["pwd"])
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+<Warning>
+  **Never commit sensitive credentials to version control!** Use `.env` files and add them to `.gitignore`.
+</Warning>
+
+## Complex Parametrization Patterns
+
+### Testing Valid and Invalid Cases
+
+```python
+@pytest.mark.parametrize(
+    "username, password, should_succeed",
+    [
+        ("standard_user", "secret_sauce", True),
+        ("locked_out_user", "secret_sauce", False),
+        ("standard_user", "wrong_password", False),
+        ("", "", False),
+    ],
+    ids=["valid-login", "locked-user", "wrong-password", "empty-credentials"]
+)
+def test_login_scenarios(page, username, password, should_succeed):
+    page.goto("https://www.saucedemo.com/")
+    page.get_by_placeholder("Username").fill(username)
+    page.get_by_placeholder("Password").fill(password)
+    page.locator("#login-button").click()
+    
+    if should_succeed:
+        assert page.get_by_test_id("title").is_visible()
+    else:
+        assert page.locator(".error-message").is_visible()
+```
+
+### Combining Multiple Parametrize Decorators
+
+```python
+@pytest.mark.parametrize("username", ["standard_user", "problem_user"])
+@pytest.mark.parametrize("product", ["backpack", "bike-light", "bolt-tshirt"])
+def test_add_products(page, username, product):
+    # This creates 2 × 3 = 6 test combinations
+    # Each username tested with each product
+    pass
+```
+
+<Note>
+  Multiple decorators create a **cartesian product** of all parameter combinations. Use carefully to avoid test explosion!
+</Note>
+
+## Parametrizing Fixtures
+
+Create fixtures that run with different configurations:
+
+```python conftest.py
+@pytest.fixture(params=[
+    "chromium",
+    "firefox",
+    "webkit"
+])
+def browser_type(request):
+    return request.param
+
+def test_cross_browser(page, browser_type):
+    # Test runs 3 times, once per browser
+    print(f"Testing on {browser_type}")
+    page.goto("https://example.com")
+    assert page.title()
+```
+
+## Conditional Parametrization
+
+Skip certain parameter combinations based on conditions:
+
+```python
+import pytest
+import sys
+
+@pytest.mark.parametrize(
+    "browser",
+    [
+        "chromium",
+        pytest.param(
+            "webkit",
+            marks=pytest.mark.skipif(
+                sys.platform == "linux",
+                reason="WebKit unstable on Linux"
+            )
+        )
+    ]
+)
+def test_browser_specific(page, browser):
+    pass
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Start Simple" icon="seedling">
+    Begin with basic parametrization before adding complexity
+  </Card>
+  <Card title="Use Descriptive IDs" icon="tag">
+    Always provide custom test IDs for clarity in reports
+  </Card>
+  <Card title="External Data Files" icon="file">
+    Store large datasets in JSON/CSV files, not in decorators
+  </Card>
+  <Card title="Document Parameters" icon="book">
+    Add docstrings explaining what each parameter represents
+  </Card>
+</CardGroup>
+
+<Steps>
+  <Step title="Identify repeated test logic">
+    Find tests that differ only in input values
+  </Step>
+  <Step title="Extract common code">
+    Move shared logic into a single parametrized test
+  </Step>
+  <Step title="Define parameter sets">
+    List all value combinations to test
+  </Step>
+  <Step title="Add test IDs">
+    Make test output readable with custom IDs
+  </Step>
+  <Step title="Run and verify">
+    Ensure each parameter set runs independently
+  </Step>
+</Steps>
+
+## Data-Driven Testing Example
+
+Complete example combining multiple techniques:
+
+<CodeGroup>
+
+```python test_parametrized.py
+import pytest
+from pages.login import LoginPage
+
+@pytest.mark.parametrize(
+    "username, password, expected_result",
+    [
+        ("standard_user", "secret_sauce", "success"),
+        ("locked_out_user", "secret_sauce", "locked"),
+        ("standard_user", "wrong", "invalid"),
+        ("", "secret_sauce", "invalid"),
+    ],
+    ids=["valid", "locked-user", "wrong-password", "empty-username"]
+)
+def test_login_scenarios(page, username, password, expected_result):
+    """Test various login scenarios with different credentials."""
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(username, password)
+    
+    if expected_result == "success":
+        assert page.get_by_test_id("title").is_visible()
+        assert "/inventory.html" in page.url
+    elif expected_result == "locked":
+        error = page.get_by_text("Sorry, this user has been locked out")
+        assert error.is_visible()
+    else:  # invalid
+        error = page.get_by_text("do not match")
+        assert error.is_visible()
+```
+
+```python conftest.py
+import pytest
+import json
+from pathlib import Path
+
+@pytest.fixture(scope="session")
+def test_users():
+    """Load test users from JSON file."""
+    data_path = Path(__file__).parent / "testData" / "users.json"
+    with data_path.open() as f:
+        return json.load(f)
+
+@pytest.fixture(params=["chromium", "firefox"])
+def browser_name(request):
+    """Parametrized browser fixture for cross-browser testing."""
+    return request.param
+```
+
+```json testData/users.json
+{
+  "validUser": {
+    "username": "standard_user",
+    "password": "secret_sauce"
+  },
+  "invalidUser": {
+    "username": "locked_out_user",
+    "password": "secret_sauce"
+  },
+  "testUsers": [
+    {"username": "error_user", "password": "secret_sauce"},
+    {"username": "visual_user", "password": "secret_sauce"}
+  ]
+}
+```
+
+</CodeGroup>
+
+## Debugging Parametrized Tests
+
+```bash
+# Run specific parameter set
+pytest test_login.py::test_multiple_users[error-user]
+
+# Run all parameter sets for one test
+pytest test_login.py::test_multiple_users
+
+# Verbose output shows each parameter
+pytest -v test_login.py::test_multiple_users
+
+# See parameter values in output
+pytest -v -s test_login.py::test_multiple_users
+```
+
+<Tip>
+  When a parametrized test fails, pytest shows which parameter set caused the failure, making debugging easier.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fixtures" icon="wrench" href="/concepts/fixtures">
+    Deep dive into pytest fixtures
+  </Card>
+  <Card title="Test Data" icon="database" href="/concepts/test-data">
+    Manage test data effectively
+  </Card>
+  <Card title="Best Practices" icon="star" href="/advanced/best-practices">
+    Learn testing best practices
+  </Card>
+  <Card title="CI/CD Integration" icon="arrows-rotate" href="/advanced/ci-cd">
+    Run parametrized tests in CI/CD
+  </Card>
+</CardGroup>

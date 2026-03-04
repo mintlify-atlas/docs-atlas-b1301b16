@@ -1,0 +1,291 @@
+---
+title: 'Page Object Model'
+description: 'Learn how to organize test code using the Page Object Model pattern for maintainable and reusable automation'
+icon: 'layer-group'
+---
+
+## What is Page Object Model?
+
+The **Page Object Model (POM)** is a design pattern that creates an object-oriented representation of web pages in your test automation framework. Each page in your application is represented by a class that encapsulates the page's elements and behaviors.
+
+<Note>
+  **Key Benefits:**
+  - Separates test logic from page-specific code
+  - Reduces code duplication
+  - Makes tests easier to maintain when UI changes
+  - Improves test readability
+</Note>
+
+## Structure of a Page Object
+
+A typical page object class contains:
+
+1. **Constructor** - Initializes the page with a Playwright Page instance
+2. **Locators** - Element selectors stored as class attributes
+3. **Methods** - Actions that can be performed on the page
+
+## Real Examples from Our Test Suite
+
+<Tabs>
+  <Tab title="Login Page">
+    Let's look at the `LoginPage` class from our test suite:
+
+    ```python pages/login.py
+    from playwright.sync_api import Page
+    import pytest
+
+    class LoginPage:
+        def __init__(self, page):
+            self.page = page
+            self.username_input = page.locator("[data-test=\"username\"]")
+            self.password_input = page.locator("[data-test=\"password\"]")
+            self.login_button = page.locator("[data-test=\"login-button\"]")
+
+        def navigate(self):
+            self.page.goto("https://www.saucedemo.com/")
+
+        def login(self, username, password):
+            self.username_input.fill(username)
+            self.password_input.fill(password)
+            self.login_button.click()
+    ```
+
+    **Key Components:**
+    - **Locators**: Defined in `__init__` using data-test attributes
+    - **navigate()**: Handles page navigation
+    - **login()**: Encapsulates the login workflow
+  </Tab>
+
+  <Tab title="Cart Page">
+    The `CartPage` class demonstrates more complex interactions:
+
+    ```python pages/cart_page.py
+    from playwright.sync_api import Page, expect
+
+    class CartPage:
+        def __init__(self, page):
+            self.page = page
+            self.cart_badge = page.locator("[data-test=\"shopping-cart-link\"]")
+            self.cart_items = page.locator(".cart_item")
+            self.checkout_button = page.locator("#checkout")
+
+        def go_to_cart(self):
+            self.page.locator(".shopping_cart_link").click()
+
+        def add_product(self, product_name: str):
+            add_button = self.page.locator(f"#add-to-cart-{product_name}")
+            add_button.click()
+
+        def remove_product(self, product_name: str):
+            remove_button = self.page.locator(f"#remove-{product_name}")
+            remove_button.click()
+
+        def get_cart_count(self) -> int:
+            if self.cart_badge.count() == 0:
+                return 0
+            return int(self.cart_badge.text_content())
+
+        def get_cart_items(self):
+            return self.cart_items.all_text_contents()
+    ```
+
+    **Advanced Features:**
+    - **Dynamic locators**: Using f-strings for product-specific buttons
+    - **Data retrieval methods**: `get_cart_count()` and `get_cart_items()`
+    - **Type hints**: Using Python type annotations for better code clarity
+  </Tab>
+
+  <Tab title="Checkout Page">
+    A simpler page object example:
+
+    ```python pages/checkout.py
+    from playwright.sync_api import Page, expect
+
+    class CheckoutPage:
+        def __init__(self, page):
+            self.page = page
+            self.checkout_button = page.locator("[data-test=\"checkout\"]")
+            self.checkout_message = page.locator("[data-test=\"title\"]")
+
+        def go_to_checkout(self):
+            self.checkout_button.click()
+    ```
+
+    This minimal page object focuses only on checkout navigation.
+  </Tab>
+</Tabs>
+
+## Using Page Objects in Tests
+
+Here's how these page objects are used in actual test cases:
+
+<CodeGroup>
+```python tests/test_functionalities.py (Simple Login)
+from pages.login import LoginPage
+
+def test_successful_login(page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+```python tests/test_functionalities.py (Multiple Pages)
+from pages.login import LoginPage
+from pages.cart_page import CartPage
+from pages.checkout import CheckoutPage
+from playwright.sync_api import Page, expect
+
+def test_checkout_process(page):
+    # Login
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+    assert page.get_by_test_id("title").is_visible
+
+    # Add products to cart
+    cart_page = CartPage(page)
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    expect(cart_page.cart_badge).to_contain_text("2")
+
+    # Go to cart
+    cart_page.go_to_cart()
+
+    # Proceed to checkout
+    checkout = CheckoutPage(page)
+    checkout.go_to_checkout()
+
+    expect(checkout.checkout_message).to_be_visible()
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep Methods Focused">
+    Each method should do one thing well. For example, `login()` handles only the login action, not navigation and assertion.
+
+    ```python
+    # Good: Separate concerns
+    login_page.navigate()
+    login_page.login(username, password)
+
+    # Avoid: Doing too much in one method
+    login_page.navigate_and_login_and_verify(username, password)
+    ```
+  </Accordion>
+
+  <Accordion title="Use Descriptive Locators">
+    Store locators in the constructor with meaningful names:
+
+    ```python
+    def __init__(self, page):
+        self.page = page
+        # Clear, descriptive names
+        self.username_input = page.locator("[data-test='username']")
+        self.password_input = page.locator("[data-test='password']")
+        self.login_button = page.locator("[data-test='login-button']")
+    ```
+  </Accordion>
+
+  <Accordion title="Return Data, Don't Assert">
+    Page objects should return data for tests to assert on:
+
+    ```python
+    # Good: Return data
+    def get_cart_count(self) -> int:
+        if self.cart_badge.count() == 0:
+            return 0
+        return int(self.cart_badge.text_content())
+
+    # Usage in test
+    assert cart_page.get_cart_count() == 2
+
+    # Avoid: Assertions in page objects
+    def verify_cart_count(self, expected):
+        assert self.get_cart_count() == expected
+    ```
+  </Accordion>
+
+  <Accordion title="Make Locators Flexible">
+    Use parameters for dynamic elements:
+
+    ```python
+    def add_product(self, product_name: str):
+        add_button = self.page.locator(f"#add-to-cart-{product_name}")
+        add_button.click()
+
+    # Usage
+    cart_page.add_product("sauce-labs-backpack")
+    cart_page.add_product("sauce-labs-bike-light")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Comparison: With vs Without POM
+
+<Tabs>
+  <Tab title="Without POM">
+    Tests contain all page interaction details:
+
+    ```python tests/test_login.py
+    def test_valid_login(page: Page):
+        page.goto("https://www.saucedemo.com/")
+        
+        username_input = page.get_by_placeholder("Username")
+        username_input.fill("standard_user")
+
+        password_input = page.get_by_placeholder("Password")
+        password_input.fill("secret_sauce")
+
+        login_button = page.locator("input#login-button")
+        login_button.click()
+        
+        assert page.get_by_test_id("title").is_visible
+        assert page.url == "https://www.saucedemo.com/inventory.html"
+    ```
+
+    **Problems:**
+    - Locators repeated across tests
+    - Hard to maintain when UI changes
+    - Test logic mixed with implementation details
+  </Tab>
+
+  <Tab title="With POM">
+    Clean, maintainable tests using page objects:
+
+    ```python tests/test_functionalities.py
+    from pages.login import LoginPage
+
+    def test_successful_login(page):
+        login_page = LoginPage(page)
+        login_page.navigate()
+        login_page.login("standard_user", "secret_sauce")
+
+        assert page.get_by_test_id("title").is_visible
+    ```
+
+    **Benefits:**
+    - Clean, readable test code
+    - Locators centralized in page objects
+    - Easy to update when UI changes
+    - Reusable across multiple tests
+  </Tab>
+</Tabs>
+
+<Warning>
+  **Common Mistake:** Don't include assertions in page object methods. Page objects should only interact with the page and return data. Let your tests handle assertions.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fixtures" icon="flask" href="/concepts/fixtures">
+    Learn how to set up test data and page objects using pytest fixtures
+  </Card>
+  <Card title="Test Data" icon="database" href="/concepts/test-data">
+    Discover how to manage test data separately from test logic
+  </Card>
+</CardGroup>

@@ -1,0 +1,458 @@
+---
+title: 'Installation'
+description: 'Complete setup guide for the QA Automation Learning framework'
+icon: 'download'
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Python 3.11+" icon="python">
+    Required for running pytest and Playwright
+  </Card>
+  <Card title="pip" icon="box">
+    Python package manager (included with Python)
+  </Card>
+  <Card title="Git" icon="git">
+    For cloning the repository
+  </Card>
+  <Card title="Terminal/Command Line" icon="terminal">
+    To run commands and tests
+  </Card>
+</CardGroup>
+
+### Verify Python Installation
+
+Check your Python version:
+
+```bash
+python --version
+# or
+python3 --version
+```
+
+You should see Python 3.11 or higher.
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Get the source code from GitHub:
+    
+    ```bash
+    git clone https://github.com/yourusername/qa-automation-learning.git
+    cd qa-automation-learning
+    ```
+  </Step>
+
+  <Step title="Create a Virtual Environment (Recommended)">
+    Using a virtual environment keeps your project dependencies isolated:
+    
+    <CodeGroup>
+    
+    ```bash macOS/Linux
+    python3 -m venv venv
+    source venv/bin/activate
+    ```
+    
+    ```bash Windows
+    python -m venv venv
+    venv\Scripts\activate
+    ```
+    
+    </CodeGroup>
+    
+    You'll see `(venv)` in your terminal prompt when the virtual environment is active.
+  </Step>
+
+  <Step title="Install Python Dependencies">
+    Install all required packages from `requirements.txt`:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    ### Installed Packages
+    
+    The `requirements.txt` includes:
+    
+    ```txt requirements.txt
+    pytest
+    pytest-html
+    pytest-playwright
+    playwright
+    python-dotenv
+    ```
+    
+    <Accordion title="Package Details">
+      - **pytest** - Modern Python testing framework with powerful features
+      - **pytest-html** - Generates beautiful HTML test reports
+      - **pytest-playwright** - Pytest plugin for Playwright integration
+      - **playwright** - Browser automation library supporting Chromium, Firefox, and WebKit
+      - **python-dotenv** - Loads environment variables from `.env` files
+    </Accordion>
+  </Step>
+
+  <Step title="Install Playwright Browsers">
+    Playwright requires browser binaries to be installed separately:
+    
+    ```bash
+    python -m playwright install --with-deps
+    ```
+    
+    This downloads:
+    - Chromium
+    - Firefox
+    - WebKit (Safari engine)
+    
+    <Note>
+      The `--with-deps` flag installs system dependencies required on Linux. On macOS and Windows, you can omit this flag: `python -m playwright install`
+    </Note>
+    
+    ### Install Specific Browsers Only
+    
+    To save disk space, install only what you need:
+    
+    ```bash
+    # Chromium only
+    python -m playwright install chromium
+    
+    # Firefox only
+    python -m playwright install firefox
+    
+    # WebKit only
+    python -m playwright install webkit
+    ```
+  </Step>
+
+  <Step title="Verify Installation">
+    Run a test to confirm everything is working:
+    
+    ```bash
+    pytest tests/test_login.py::test_valid_login -v
+    ```
+    
+    Expected output:
+    
+    ```
+    tests/test_login.py::test_valid_login PASSED [100%]
+    ```
+    
+    <Check>
+      If the test passes, your installation is complete!
+    </Check>
+  </Step>
+</Steps>
+
+## Project Structure
+
+After installation, your project structure looks like this:
+
+```
+qa-automation-learning/
+├── .github/
+│   └── workflows/
+│       └── playwright.yml      # CI/CD configuration
+├── pages/                      # Page Object Model classes
+│   ├── __init__.py
+│   ├── login.py               # Login page object
+│   ├── cart_page.py           # Shopping cart page object
+│   └── checkout.py            # Checkout page object
+├── testData/                  # Test data files
+│   └── users.json             # User credentials
+├── tests/                     # Test files
+│   ├── __init__.py
+│   ├── conftest.py           # Pytest fixtures and configuration
+│   ├── test_login.py         # Login tests
+│   ├── test_assertions.py    # Assertion examples
+│   ├── test_functionalities.py # E2E functionality tests
+│   └── test_API.py           # API tests
+├── requirements.txt          # Python dependencies
+└── README.md
+```
+
+## Configuration
+
+### Test Fixtures
+
+The project uses pytest fixtures defined in `tests/conftest.py:8` for test data management:
+
+<CodeGroup>
+
+```python JSON Test Data Fixture
+import json
+from pathlib import Path
+import pytest
+
+@pytest.fixture(scope="session")
+def users():
+    """
+    Loads testData/users.json and returns a dict.
+    Accessible in any test as the 'users' fixture.
+    """
+    root = Path(__file__).parent.parent
+    data_path = root / "testData" / "users.json"
+    with data_path.open(encoding="utf-8") as f:
+        return json.load(f)
+```
+
+```python Environment Variable Fixture
+import os
+from dotenv import load_dotenv
+import pytest
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+
+@pytest.fixture(scope="session")
+def creds():
+    """
+    Provides credentials from environment variables.
+    Fails early with a clear message if missing.
+    """
+    user = os.getenv("USERNAME")
+    pwd = os.getenv("PASSWORD")
+    if not user or not pwd:
+        raise RuntimeError("Missing USERNAME/PASSWORD in environment.")
+    return {"valid_user": user, "pwd": pwd}
+```
+
+</CodeGroup>
+
+### Environment Variables Setup
+
+Create a `.env` file in the project root for sensitive credentials:
+
+```bash .env
+USERNAME=standard_user
+PASSWORD=secret_sauce
+```
+
+<Warning>
+  Never commit `.env` files to version control. Add it to your `.gitignore` file.
+</Warning>
+
+### Test Data Files
+
+Store test data in JSON format at `testData/users.json`:
+
+```json testData/users.json
+{
+  "validUser": { 
+    "username": "standard_user", 
+    "password": "secret_sauce" 
+  },
+  "invalidUser": { 
+    "username": "locked_out_user", 
+    "password": "secret_sauce" 
+  }
+}
+```
+
+Use in tests with the `users` fixture:
+
+```python
+def test_with_testdata(page, users):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login(
+        users["validUser"]["username"], 
+        users["validUser"]["password"]
+    )
+    assert page.get_by_test_id("title").is_visible
+```
+
+## CI/CD Setup
+
+The project includes a GitHub Actions workflow at `.github/workflows/playwright.yml:1` that automatically runs tests on every push and pull request.
+
+<Accordion title="View GitHub Actions Workflow">
+
+```yaml .github/workflows/playwright.yml
+name: CI - Run login test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install --with-deps
+
+      - name: Run Tests
+        run: |
+          mkdir -p test-results
+          python -m pytest tests/test_login.py \
+            --junitxml=test-results/junit.xml \
+            --html=test-results/report.html --self-contained-html \
+            --maxfail=1 -q --disable-warnings
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+          retention-days: 7
+```
+
+</Accordion>
+
+### Key CI Features:
+
+- Runs on Ubuntu latest
+- Python 3.11
+- Installs dependencies and browsers automatically
+- Generates HTML and JUnit XML reports
+- Uploads test results as artifacts (retained for 7 days)
+- Triggered on push, PR, or manual dispatch
+
+## Playwright Configuration
+
+<Tabs>
+  <Tab title="Browser Selection">
+    Control which browser to use:
+    
+    ```bash
+    # Chromium (default)
+    pytest tests/test_login.py --browser chromium
+    
+    # Firefox
+    pytest tests/test_login.py --browser firefox
+    
+    # WebKit
+    pytest tests/test_login.py --browser webkit
+    
+    # All browsers
+    pytest tests/test_login.py --browser chromium --browser firefox --browser webkit
+    ```
+  </Tab>
+  
+  <Tab title="Headed vs Headless">
+    Run tests with visible browser:
+    
+    ```bash
+    # Headless (default, no UI)
+    pytest tests/test_login.py
+    
+    # Headed (visible browser)
+    pytest tests/test_login.py --headed
+    ```
+  </Tab>
+  
+  <Tab title="Device Emulation">
+    Test on mobile devices:
+    
+    ```bash
+    # iPhone 13
+    pytest tests/test_login.py --device="iPhone 13"
+    
+    # Pixel 5
+    pytest tests/test_login.py --device="Pixel 5"
+    
+    # iPad Pro
+    pytest tests/test_login.py --device="iPad Pro"
+    ```
+  </Tab>
+  
+  <Tab title="Debugging">
+    Debug failing tests:
+    
+    ```bash
+    # Slow motion (1 second between actions)
+    pytest tests/test_login.py --headed --slowmo 1000
+    
+    # Debug mode (Playwright Inspector)
+    PWDEBUG=1 pytest tests/test_login.py
+    
+    # Screenshots on failure
+    pytest tests/test_login.py --screenshot on
+    
+    # Video recording
+    pytest tests/test_login.py --video on
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="ModuleNotFoundError: No module named 'playwright'">
+    **Solution:** Ensure you've installed dependencies and activated your virtual environment:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+  </Accordion>
+  
+  <Accordion title="Executable doesn't exist at path">
+    **Solution:** Install Playwright browsers:
+    
+    ```bash
+    python -m playwright install
+    ```
+  </Accordion>
+  
+  <Accordion title="Tests timing out or running slowly">
+    **Solution:** Check your internet connection and consider increasing timeouts:
+    
+    ```python
+    page.goto("https://example.com", timeout=60000)  # 60 seconds
+    ```
+  </Accordion>
+  
+  <Accordion title="RuntimeError: Missing USERNAME/PASSWORD in environment">
+    **Solution:** Create a `.env` file in the project root:
+    
+    ```bash
+    echo "USERNAME=standard_user" > .env
+    echo "PASSWORD=secret_sauce" >> .env
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first test in minutes
+  </Card>
+  <Card title="Writing Tests" icon="code">
+    Learn how to write effective test cases
+  </Card>
+  <Card title="Page Object Model" icon="object-group">
+    Organize tests with the POM pattern
+  </Card>
+  <Card title="Advanced Features" icon="wand-magic-sparkles">
+    Explore fixtures, parametrization, and more
+  </Card>
+</CardGroup>
+
+<Check>
+  You're all set! Start writing tests and building your automation skills.
+</Check>

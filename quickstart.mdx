@@ -1,80 +1,214 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Get up and running with your first automated test in minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+## Welcome to QA Automation Learning
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This quickstart guide will help you run your first automated test in minutes. We'll use Playwright with Python to test a demo e-commerce application.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This guide assumes you have Python 3.11+ installed on your system. If not, download it from [python.org](https://www.python.org/downloads/).
 </Note>
+
+## Quick Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    Get the source code from GitHub:
+    
+    ```bash
+    git clone https://github.com/yourusername/qa-automation-learning.git
+    cd qa-automation-learning
+    ```
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all required packages using pip:
+    
+    ```bash
+    pip install -r requirements.txt
+    ```
+    
+    This installs:
+    - `pytest` - Testing framework
+    - `pytest-html` - HTML report generation
+    - `pytest-playwright` - Playwright integration
+    - `playwright` - Browser automation
+    - `python-dotenv` - Environment variable management
+  </Step>
+
+  <Step title="Install browser drivers">
+    Playwright needs browser binaries to run tests:
+    
+    ```bash
+    python -m playwright install --with-deps
+    ```
+    
+    <Note>
+      The `--with-deps` flag installs system dependencies needed for browsers on Linux.
+    </Note>
+  </Step>
+
+  <Step title="Run your first test">
+    Execute the login test suite:
+    
+    ```bash
+    pytest tests/test_login.py -v
+    ```
+    
+    You should see output like:
+    
+    ```
+    tests/test_login.py::test_valid_login PASSED
+    tests/test_login.py::test_invalid_login PASSED
+    tests/test_login.py::test_logout_session PASSED
+    ```
+  </Step>
+</Steps>
+
+## Your First Test
+
+Let's examine the `test_valid_login` test from `tests/test_login.py:7`:
+
+```python tests/test_login.py
+from playwright.sync_api import Page
+
+URL = "https://www.saucedemo.com/"
+login_dashboard = "https://www.saucedemo.com/inventory.html"
+
+def test_valid_login(page: Page):
+    page.goto(URL)
+    
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill("standard_user")
+
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill("secret_sauce")
+
+    login_button = page.locator("input#login-button")
+    login_button.click()
+    
+    assert page.get_by_test_id("title").is_visible
+    assert page.url == login_dashboard
+```
+
+### What's Happening?
+
+1. **Page fixture** - Playwright automatically provides a fresh browser page for each test
+2. **Navigation** - `page.goto()` loads the test application
+3. **Element interaction** - Uses locators to find and fill input fields
+4. **Assertions** - Verifies the login was successful by checking the URL and dashboard visibility
+
+## Using Page Object Model
+
+The project uses the Page Object Model pattern for better code organization. Here's the same test using the `LoginPage` class from `pages/login.py:4`:
+
+<CodeGroup>
+
+```python Test with Page Object
+from pages.login import LoginPage
+from playwright.sync_api import Page
+
+def test_successful_login(page):
+    login_page = LoginPage(page)
+    login_page.navigate()
+    login_page.login("standard_user", "secret_sauce")
+
+    assert page.get_by_test_id("title").is_visible
+```
+
+```python Page Object Class
+class LoginPage:
+    def __init__(self, page):
+        self.page = page
+        self.username_input = page.locator('[data-test="username"]')
+        self.password_input = page.locator('[data-test="password"]')
+        self.login_button = page.locator('[data-test="login-button"]')
+
+    def navigate(self):
+        self.page.goto("https://www.saucedemo.com/")
+
+    def login(self, username, password):
+        self.username_input.fill(username)
+        self.password_input.fill(password)
+        self.login_button.click()
+```
+
+</CodeGroup>
+
+## Running Tests with Options
+
+<CodeGroup>
+
+```bash Verbose Output
+pytest tests/test_login.py -v
+```
+
+```bash HTML Report
+pytest tests/test_login.py --html=report.html --self-contained-html
+```
+
+```bash Specific Test
+pytest tests/test_login.py::test_valid_login
+```
+
+```bash Headful Mode
+pytest tests/test_login.py --headed
+```
+
+```bash Slow Motion (Debug)
+pytest tests/test_login.py --headed --slowmo 1000
+```
+
+</CodeGroup>
+
+## Parametrized Tests
+
+Test multiple scenarios with the same test logic using `@pytest.mark.parametrize` from `tests/test_login.py:58`:
+
+```python
+@pytest.mark.parametrize("username, password",[
+    ("error_user","secret_sauce"),
+    ("performance_glitch_user","secret_sauce"),
+    ("visual_user","secret_sauce")])
+
+def test_multiple_users(page: Page, username, password):
+    page.goto(URL)
+    
+    username_input = page.get_by_placeholder("Username")
+    username_input.fill(username)
+
+    password_input = page.get_by_placeholder("Password")
+    password_input.fill(password)
+
+    login_button = page.locator("input#login-button")
+    login_button.click()
+
+    assert page.get_by_test_id("title").is_visible
+    assert page.url == login_dashboard
+```
+
+This runs the test 3 times with different user credentials.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Deep dive into setup and configuration options
+  </Card>
+  <Card title="Test Data Management" icon="database">
+    Learn how to use fixtures and external data files
+  </Card>
+  <Card title="Page Objects" icon="object-group">
+    Master the Page Object Model pattern
+  </Card>
+  <Card title="CI/CD Integration" icon="gears">
+    Run tests in GitHub Actions
+  </Card>
+</CardGroup>
+
+<Warning>
+  The default credentials (`standard_user` / `secret_sauce`) work only with the Sauce Demo application. You'll need to configure your own credentials for other applications.
+</Warning>
