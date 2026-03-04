@@ -1,0 +1,89 @@
+{
+  "projectType": "general",
+  "projectName": "QA Automation Learning",
+  "projectDescription": "A comprehensive learning repository for test automation using Playwright and pytest with the Page Object Model pattern.",
+  "theme": "mint",
+  "primaryColor": "#10B981",
+  "lightColor": "#34D399",
+  "darkColor": "#059669",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/page-object-model",
+              "concepts/fixtures",
+              "concepts/test-data"
+            ]
+          },
+          {
+            "group": "Writing Tests",
+            "pages": [
+              "tests/ui-testing",
+              "tests/api-testing",
+              "tests/assertions",
+              "tests/parametrization"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/ci-cd",
+              "advanced/best-practices",
+              "advanced/locator-strategies"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Page Objects",
+            "pages": [
+              "api/login-page",
+              "api/cart-page",
+              "api/checkout-page"
+            ]
+          },
+          {
+            "group": "Test Fixtures",
+            "pages": [
+              "api/fixtures"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Page Object Model (POM) design pattern",
+    "Pytest fixtures for test data management",
+    "UI testing with Playwright",
+    "API testing capabilities",
+    "Parametrized tests for multiple scenarios",
+    "CI/CD integration with GitHub Actions"
+  ],
+  "publicApiSurface": [
+    "LoginPage.navigate()",
+    "LoginPage.login(username, password)",
+    "CartPage.add_product(product_name)",
+    "CartPage.remove_product(product_name)",
+    "CartPage.go_to_cart()",
+    "CartPage.get_cart_count()",
+    "CheckoutPage.go_to_checkout()",
+    "users fixture - loads test data from JSON",
+    "creds fixture - loads credentials from environment variables"
+  ]
+}
